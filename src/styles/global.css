@@ -4,27 +4,47 @@
    所有可调颜色都在 :root 里，想换配色只改这一段
    ======================================================================== */
 
-/* ---------- 1. 主题变量 ---------- */
+/* =========================================================================
+   色板总览（想改配色，只动这一段就够）
+   -------------------------------------------------------------------------
+   基底：白 + 蓝          —— 品牌主色，全站 90% 的视觉重量都在这两个上
+   点缀：阳光感的明亮彩色  —— 黄 / 橙 / 珊瑚 / 薄荷，小面积出现，提亮画面
+   禁忌：不使用紫色        —— 旧的 --purple 已重定向到天蓝，全站无紫
+
+   命名分两层：
+     · 语义名（--blue / --sky / --sun / --amber / --coral / --mint）→ 新样式用这一层
+     · 兼容名（--pink / --glow-cyan / --purple …）→ 老样式在用，统一重定向到新色板
+   ========================================================================= */
+
+/* ---------- 1. 主题变量 · 夜间（深空蓝） ---------- */
 :root {
-  /* 夜色主题（默认） */
-  --bg-deep: #0b0716;
-  --bg-mid: #150d29;
-  --bg-glow-a: rgba(255, 107, 157, 0.18);
-  --bg-glow-b: rgba(94, 234, 212, 0.12);
+  /* --- 语义色板：主蓝 --- */
+  --blue: #3b82f6;
+  --blue-deep: #60a5fa;
+  --blue-soft: #93c5fd;
+  /* --- 语义色板：天蓝 --- */
+  --sky: #38bdf8;
+  --sky-soft: #7dd3fc;
+  /* --- 语义色板：阳光点缀 --- */
+  --sun: #fbbf24;
+  --amber: #fb923c;
+  --coral: #fb7185;
+  --mint: #2dd4bf;
 
-  --pink: #ff6b9d;
-  --pink-soft: #ff9ec0;
-  --glow-cyan: #5eead4;
-  --purple: #a78bfa;
+  /* --- 底色：深空蓝，不用紫 --- */
+  --bg-deep: #061223;
+  --bg-mid: #0a1c33;
+  --bg-glow-a: rgba(56, 189, 248, 0.16);
+  --bg-glow-b: rgba(251, 191, 36, 0.07);
 
-  --text: #ece8f6;
-  --muted: #9b93b5;
+  --text: #e8f2fd;
+  --muted: #92aac6;
   --border-sub: rgba(255, 255, 255, 0.09);
 
   --card-bg: rgba(255, 255, 255, 0.045);
-  --card-bg-hover: rgba(255, 255, 255, 0.075);
-  --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-  --nav-bg: rgba(14, 9, 26, 0.72);
+  --card-bg-hover: rgba(255, 255, 255, 0.08);
+  --card-shadow: 0 8px 32px rgba(0, 0, 0, 0.38);
+  --nav-bg: rgba(6, 18, 35, 0.74);
 
   --radius-sm: 10px;
   --radius-md: 16px;
@@ -35,28 +55,96 @@
   --font-mono: 'JetBrains Mono', 'Consolas', monospace;
 
   --content-width: 1180px;
+
+  /* ---------- 1.1 层级背景（玻璃拟态三层） ---------- */
+  --web: rgba(6, 18, 35, 0.88);
+  --card: rgba(12, 28, 50, 0.62);
+  --card-hover: rgba(16, 36, 62, 0.76);
+  --glass: rgba(10, 24, 44, 0.6);
+  --glass-strong: rgba(14, 32, 56, 0.78);
+  --glass-blur: 20px;
+
+  --border-hi: rgba(255, 255, 255, 0.1);
+  --border-ac: rgba(59, 130, 246, 0.3);
+
+  /* 光晕（--glow-cyan 是颜色值，光晕统一叫 --halo-*） */
+  --halo-blue: rgba(59, 130, 246, 0.14);
+  --halo-sky: rgba(56, 189, 248, 0.1);
+  --halo-sun: rgba(251, 191, 36, 0.08);
+  --halo-coral: rgba(251, 113, 133, 0.07);
+
+  /* 缓动曲线 */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 卡片悬浮位移量（改一个值，全站卡片的悬停幅度一起变） */
+  --card-lift: -6px;
+
+  /* ---------- 1.2 兼容名 → 统一重定向到新色板 ---------- */
+  /* 主强调色从「粉」换成「蓝」，--pink 这个名字保留是为了不动老样式 */
+  --pink: var(--blue);
+  --pink-soft: var(--blue-soft);
+  --glow-cyan: var(--sky);
+  --purple: var(--sky); /* 原来的紫色 → 天蓝：全站消除紫色调 */
+  --cyan: var(--mint);
+  --cyan-soft: #7fe3d8;
+  --yellow: var(--sun);
+  --orange: var(--amber);
+  --halo-pink: var(--halo-blue);
+  --halo-cyan: var(--halo-sky);
+  --halo-purple: var(--halo-sky);
+  --halo-gold: var(--halo-sun);
 }
 
-/* 日间主题 */
-.game-scene.day-mode {
-  --bg-deep: #f4f1fb;
-  --bg-mid: #e9e3f7;
-  --bg-glow-a: rgba(255, 107, 157, 0.22);
-  --bg-glow-b: rgba(94, 234, 212, 0.18);
+/* ---------- 1.3 主题变量 · 日间（白 + 蓝，本站默认主题） ---------- */
+html.day-theme {
+  /* 主蓝在浅底上要压深一档才有足够的对比 */
+  --blue: #2563eb;
+  --blue-deep: #1d4ed8;
+  --blue-soft: #60a5fa;
+  --sky: #0284c7;
+  --sky-soft: #38bdf8;
+  /* 阳光点缀在浅底上也加深，避免发灰 */
+  --sun: #f59e0b;
+  --amber: #ea580c;
+  --coral: #f43f5e;
+  --mint: #0d9488;
 
-  --pink: #e8437d;
-  --pink-soft: #f2779f;
-  --glow-cyan: #0ea5a0;
-  --purple: #7c5cf0;
+  --bg-deep: #f7fafd;
+  --bg-mid: #e8f2fd;
+  --bg-glow-a: rgba(56, 189, 248, 0.22);
+  --bg-glow-b: rgba(251, 191, 36, 0.16);
 
-  --text: #241b38;
-  --muted: #6b6486;
-  --border-sub: rgba(30, 20, 50, 0.1);
+  --text: #0f2b47;
+  --muted: #5b7796;
+  --border-sub: rgba(15, 43, 71, 0.1);
 
-  --card-bg: rgba(255, 255, 255, 0.72);
-  --card-bg-hover: rgba(255, 255, 255, 0.9);
-  --card-shadow: 0 8px 32px rgba(80, 60, 130, 0.12);
-  --nav-bg: rgba(255, 255, 255, 0.75);
+  --card-bg: rgba(255, 255, 255, 0.78);
+  --card-bg-hover: rgba(255, 255, 255, 0.96);
+  --card-shadow: 0 8px 32px rgba(37, 99, 235, 0.1);
+  --nav-bg: rgba(255, 255, 255, 0.82);
+
+  /* 日间下的层级背景与光晕 */
+  --web: rgba(255, 255, 255, 0.9);
+  --card: rgba(255, 255, 255, 0.96);
+  --card-hover: #ffffff;
+  --glass: rgba(255, 255, 255, 0.72);
+  --glass-strong: rgba(255, 255, 255, 0.9);
+
+  --border-hi: rgba(15, 43, 71, 0.16);
+  --border-ac: rgba(37, 99, 235, 0.26);
+
+  --halo-blue: rgba(37, 99, 235, 0.1);
+  --halo-sky: rgba(2, 132, 199, 0.09);
+  --halo-sun: rgba(245, 158, 11, 0.1);
+  --halo-coral: rgba(244, 63, 94, 0.07);
+
+  /* 白底上叶脉要反过来用深色 */
+  --leaf-vein: rgba(15, 43, 71, 0.32);
+
+  --cyan-soft: #63c9ba;
 }
 
 /* ---------- 2. 基础重置 ---------- */
@@ -114,12 +202,8 @@ img {
 .game-scene {
   position: relative;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at 12% 0%, var(--bg-glow-a) 0%, transparent 45%),
-    radial-gradient(circle at 88% 12%, var(--bg-glow-b) 0%, transparent 42%),
-    linear-gradient(180deg, var(--bg-mid) 0%, var(--bg-deep) 60%);
-  background-attachment: fixed;
-  transition: background 0.6s ease;
+  /* 底色已经在 body 上（为了配合固定的光斑层），这里保持透明 */
+  background: transparent;
 }
 
 /* 细网格纹理，像素感来源 */
@@ -210,9 +294,29 @@ img {
   top: 0;
   z-index: 80;
   background: var(--nav-bg);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
   border-bottom: 1px solid var(--border-sub);
+}
+
+/* 导航底部的品牌渐变细线：蓝 → 阳光黄 → 天蓝，很轻，只在边缘提亮 */
+.navbar::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  pointer-events: none;
+  opacity: 0.45;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--blue) 24%,
+    var(--sun) 50%,
+    var(--sky) 76%,
+    transparent
+  );
 }
 
 .navbar-inner {
@@ -224,16 +328,81 @@ img {
   gap: 24px;
 }
 
+/* ---- 品牌标志区 ---- */
 .nav-logo {
-  font-family: var(--font-pixel);
-  font-size: 1.35rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  background: linear-gradient(120deg, var(--pink), var(--glow-cyan));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
   white-space: nowrap;
+}
+
+.nav-logo-text {
+  font-family: var(--font-pixel);
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text);
+  transition: color 0.3s ease;
+}
+.nav-logo:hover .nav-logo-text {
+  color: var(--blue);
+}
+
+.nav-logo-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sky);
+  padding: 3px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-ac);
+  background: var(--halo-sky);
+}
+
+/* ---- 引力轨道标志（导航 / 页脚共用） ---- */
+.orbit-logo {
+  display: inline-grid;
+  width: var(--ol-size, 34px);
+  height: var(--ol-size, 34px);
+  flex: none;
+  color: var(--blue);
+}
+
+.orbit-logo svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ol-ring {
+  transform-origin: 24px 24px;
+}
+
+.ol-ring ellipse {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.2;
+  opacity: 0.45;
+}
+
+/* 两条轨道反向转，周期不同，两颗光点因此永不同步 */
+.ol-ring--a {
+  animation: ol-spin 22s linear infinite;
+}
+.ol-ring--b {
+  animation: ol-spin-rev 16s linear infinite;
+}
+
+.ol-core {
+  fill: currentColor;
+}
+.ol-sat--sun {
+  fill: var(--sun);
+}
+.ol-sat--sky {
+  fill: var(--sky);
 }
 
 .nav-links {
@@ -311,82 +480,367 @@ html.day-theme .theme-toggle-btn .icon-moon {
   cursor: pointer;
 }
 
-/* ---------- 6. Hero 区 ---------- */
+/* ---------- 6. Hero 区（品牌门面） ----------
+ * 左文右图：左边是身份主张，右边是「引力」母题的轨道系统。
+ * 背景用两团品牌色柔光 + 顶部一道渐变亮边，替代原来大面积的粉紫。
+ */
 .hero {
   position: relative;
-  margin: 32px 0 44px;
-  padding: 64px 48px;
+  margin: 34px 0 48px;
+  padding: 56px 52px;
   border-radius: var(--radius-lg);
   overflow: hidden;
   border: 1px solid var(--border-sub);
   background:
-    linear-gradient(135deg, rgba(255, 107, 157, 0.16), rgba(94, 234, 212, 0.12)),
+    radial-gradient(120% 130% at 88% 6%, var(--halo-sky) 0%, transparent 58%),
+    radial-gradient(90% 120% at 2% 100%, var(--halo-blue) 0%, transparent 62%),
     var(--card-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--card-shadow);
 }
 
-.hero::after {
+/* 顶部一道细亮边 —— 品牌色的「光」，让卡片有被照亮的感觉 */
+.hero::before {
   content: '';
   position: absolute;
-  right: -60px;
-  top: -60px;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--bg-glow-a), transparent 68%);
+  inset: 0 0 auto;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--sky) 22%,
+    var(--sun) 50%,
+    var(--blue) 78%,
+    transparent
+  );
+  opacity: 0.5;
   pointer-events: none;
+}
+
+.hero-inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 40px;
+  align-items: center;
+}
+
+.hero-copy {
+  min-width: 0;
+}
+
+.hero-kicker {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sky);
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-ac);
+  background: var(--halo-sky);
+  margin-bottom: 20px;
 }
 
 .hero-title {
   position: relative;
   font-family: var(--font-pixel);
-  font-size: clamp(2rem, 5vw, 3.4rem);
-  line-height: 1.15;
-  margin: 0 0 14px;
-  letter-spacing: 2px;
-  background: linear-gradient(110deg, var(--pink), var(--purple) 55%, var(--glow-cyan));
+  font-size: clamp(2.1rem, 5.2vw, 3.5rem);
+  line-height: 1.14;
+  margin: 0 0 16px;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+
+/* 「引力」两字用蓝→天蓝渐变，是整屏的视觉锚点 */
+.hero-title-accent {
+  background: linear-gradient(100deg, var(--blue), var(--sky) 72%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
+.hero-lead {
+  margin: 0 0 18px;
+  max-width: 34em;
+  font-size: 1.02rem;
+  line-height: 1.85;
+  color: var(--muted);
+}
+
 .hero-subtitle {
   position: relative;
   font-family: var(--font-mono);
-  font-size: clamp(0.9rem, 2vw, 1.05rem);
-  color: var(--muted);
+  font-size: clamp(0.86rem, 2vw, 0.98rem);
+  color: var(--sky);
   min-height: 1.6em;
   transition: opacity 0.3s ease;
 }
 
 .hero-subtitle::after {
   content: '_';
-  color: var(--pink);
+  color: var(--sun);
   animation: blink 1.05s steps(1) infinite;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+/* 按钮 */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 22px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition:
+    transform 0.35s var(--ease-spring),
+    box-shadow 0.35s ease,
+    color 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.btn svg {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.35s var(--ease-spring);
+}
+.btn:hover svg {
+  transform: translateX(3px);
+}
+
+.btn--primary {
+  color: #fff;
+  background: linear-gradient(120deg, var(--blue), var(--sky));
+  box-shadow: 0 8px 22px -8px var(--blue);
+}
+.btn--primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 28px -10px var(--blue);
+}
+
+.btn--ghost {
+  color: var(--text);
+  border-color: var(--border-hi);
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.btn--ghost:hover {
+  border-color: var(--sky);
+  color: var(--sky);
+  transform: translateY(-2px);
 }
 
 .hero-stats {
   position: relative;
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
-  margin-top: 30px;
+  gap: 22px;
+  margin-top: 32px;
+  padding-top: 22px;
+  border-top: 1px dashed var(--border-sub);
 }
 
 .hero-stat {
-  padding: 10px 18px;
-  border-radius: 999px;
-  border: 1px solid var(--border-sub);
-  background: var(--card-bg);
   font-size: 0.85rem;
   color: var(--muted);
 }
+
 .hero-stat strong {
-  color: var(--pink);
-  font-family: var(--font-mono);
-  margin-right: 4px;
+  display: inline-block;
+  margin-right: 5px;
+  font-family: var(--font-pixel);
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--blue);
+}
+
+/* ---- 引力轨道视觉 ---- */
+.hero-orbit {
+  position: relative;
+  width: 100%;
+  max-width: 330px;
+  margin-left: auto;
+  animation: orbit-float 9s ease-in-out infinite alternate;
+}
+
+.hero-orbit svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.ho-ring {
+  transform-origin: 150px 150px;
+}
+
+.ho-ring ellipse,
+.ho-ring circle:not(.ho-sat) {
+  fill: none;
+  stroke: var(--border-hi);
+  stroke-width: 1;
+}
+
+/* 三条轨道周期互不整除，任意两条的光点永远不会同时对齐 */
+.ho-ring--1 {
+  animation: ol-spin 34s linear infinite;
+}
+.ho-ring--2 {
+  animation: ol-spin-rev 26s linear infinite;
+}
+.ho-ring--3 {
+  animation: ol-spin 20s linear infinite;
+}
+
+.ho-sat--sun {
+  fill: var(--sun);
+}
+.ho-sat--sky {
+  fill: var(--sky);
+}
+.ho-sat--coral {
+  fill: var(--coral);
+}
+
+.ho-core-dot {
+  fill: var(--sun);
+}
+
+/* 引力波：三圈错时扩散 */
+.ho-wave {
+  fill: none;
+  stroke: var(--sky);
+  stroke-width: 1.2;
+  opacity: 0;
+  transform-origin: 150px 150px;
+  animation: wave-out 5.4s ease-out infinite;
+}
+
+@keyframes ol-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ol-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+@keyframes wave-out {
+  0% {
+    transform: scale(0.42);
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+
+@keyframes orbit-float {
+  from {
+    transform: translateY(-8px);
+  }
+  to {
+    transform: translateY(10px);
+  }
+}
+
+/* ---- 引力信号：三张说明卡（品牌主页用来交代「我是谁 / 做什么」） ---- */
+.pillars {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-bottom: 46px;
+}
+
+.pillar-card {
+  position: relative;
+  padding: 24px 22px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-sub);
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  overflow: hidden;
+  transition:
+    transform 0.4s var(--ease-spring),
+    border-color 0.3s ease,
+    background 0.3s ease;
+}
+
+/* 顶部一道细渐变线，hover 时点亮 */
+.pillar-card::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  top: 0;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: linear-gradient(90deg, var(--sky), var(--sun));
+  opacity: 0.45;
+  transition: opacity 0.3s ease;
+}
+
+.pillar-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-ac);
+  background: var(--card-bg-hover);
+}
+.pillar-card:hover::before {
+  opacity: 1;
+}
+
+.pillar-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  margin-bottom: 14px;
+  color: var(--blue);
+  background: var(--halo-blue);
+  border: 1px solid var(--border-ac);
+}
+
+.pillar-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pillar-title {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.pillar-desc {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.75;
+  color: var(--muted);
 }
 
 @keyframes blink {
@@ -477,12 +931,14 @@ html.day-theme .theme-toggle-btn .icon-moon {
   padding: 2px 9px;
   border-radius: 999px;
   border: 1px solid var(--border-sub);
-  color: var(--pink);
-  background: rgba(255, 107, 157, 0.1);
+  color: var(--blue);
+  background: var(--halo-blue);
 }
+/* 置顶用阳光黄 —— 点缀色的用法之一：小面积、高辨识 */
 .post-badge.pinned {
-  color: var(--glow-cyan);
-  background: rgba(94, 234, 212, 0.12);
+  color: var(--sun);
+  background: var(--halo-sun);
+  border-color: rgba(251, 191, 36, 0.35);
 }
 
 .post-title {
@@ -528,7 +984,7 @@ html.day-theme .theme-toggle-btn .icon-moon {
 }
 .chip.cat {
   color: var(--purple);
-  border-color: rgba(167, 139, 250, 0.4);
+  border-color: var(--border-ac);
 }
 
 /* 空状态 */
@@ -542,9 +998,11 @@ html.day-theme .theme-toggle-btn .icon-moon {
 }
 
 /* ---------- 9. 侧边栏 ---------- */
+/*
+ * 侧边栏补齐小工具（天气 / 日历热力图 / 公告）之后整体变高，
+ * 再挂 position: sticky 会导致底部内容被固定高度截断，所以改成随页面滚动。
+ */
 .sidebar {
-  position: sticky;
-  top: 92px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -564,17 +1022,52 @@ html.day-theme .theme-toggle-btn .icon-moon {
 }
 
 .profile-avatar {
-  width: 76px;
-  height: 76px;
-  margin: 0 auto 14px;
+  position: relative;
+  width: 82px;
+  height: 82px;
+  margin: 0 auto 16px;
   border-radius: 50%;
   display: grid;
   place-items: center;
+  background: linear-gradient(140deg, var(--blue), var(--sky));
+  box-shadow:
+    0 0 0 4px var(--card-bg),
+    0 0 0 5px var(--border-sub),
+    0 12px 28px -12px var(--blue);
+}
+
+.profile-avatar-text {
   font-family: var(--font-pixel);
-  font-size: 1.5rem;
+  font-size: 1.42rem;
+  letter-spacing: 0.5px;
   color: #fff;
-  background: linear-gradient(135deg, var(--pink), var(--purple));
-  box-shadow: 0 0 0 4px var(--card-bg), 0 0 0 5px var(--border-sub);
+}
+
+/* 头像外圈一道虚线的自转轨道 —— 导航的引力母题在这里复用，
+   让「标志语言」贯穿全站 */
+.profile-avatar-ring {
+  position: absolute;
+  inset: -9px;
+  border-radius: 50%;
+  border: 1px dashed var(--border-ac);
+  animation: ring-spin 26s linear infinite;
+}
+.profile-avatar-ring::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin-left: -3px;
+  border-radius: 50%;
+  background: var(--sun);
+}
+
+@keyframes ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .profile-name {
@@ -1152,17 +1645,34 @@ html.day-theme .theme-toggle-btn .icon-moon {
   border-radius: 50%;
   flex: none;
 }
+/* 旧色名保留（映射到新色板），新增语义色名给 config 用 */
 .now-dot.pink {
-  background: var(--pink);
-  box-shadow: 0 0 8px var(--pink);
+  background: var(--blue);
+  box-shadow: 0 0 8px var(--blue);
 }
 .now-dot.cyan {
-  background: var(--glow-cyan);
-  box-shadow: 0 0 8px var(--glow-cyan);
+  background: var(--sky);
+  box-shadow: 0 0 8px var(--sky);
 }
 .now-dot.purple {
-  background: var(--purple);
-  box-shadow: 0 0 8px var(--purple);
+  background: var(--mint);
+  box-shadow: 0 0 8px var(--mint);
+}
+.now-dot.blue {
+  background: var(--blue);
+  box-shadow: 0 0 8px var(--blue);
+}
+.now-dot.amber {
+  background: var(--sun);
+  box-shadow: 0 0 8px var(--sun);
+}
+.now-dot.coral {
+  background: var(--coral);
+  box-shadow: 0 0 8px var(--coral);
+}
+.now-dot.mint {
+  background: var(--mint);
+  box-shadow: 0 0 8px var(--mint);
 }
 
 /* ---------- 14. 页脚 ---------- */
@@ -1226,39 +1736,253 @@ html.day-theme .theme-toggle-btn .icon-moon {
   animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* 樱花 / 粒子层 */
-.sakura-layer {
+/* ---------- 16.1 背景光斑 ----------
+ * 三团缓慢漂移的柔光，给平整的底色加一层「空气感」。
+ * 周期取 30s / 38s / 44s 三个不成倍数的值，长时间看也不会撞在一起。
+ */
+.glow-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.glow-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  will-change: transform;
+}
+
+.glow-blob--a {
+  width: 46vw;
+  height: 46vw;
+  min-width: 320px;
+  min-height: 320px;
+  top: -14vw;
+  left: -10vw;
+  background: radial-gradient(circle, var(--halo-sky) 0%, transparent 68%);
+  animation: blob-a 30s ease-in-out infinite alternate;
+}
+
+.glow-blob--b {
+  width: 38vw;
+  height: 38vw;
+  min-width: 260px;
+  min-height: 260px;
+  top: 6vh;
+  right: -12vw;
+  background: radial-gradient(circle, var(--halo-sun) 0%, transparent 66%);
+  animation: blob-b 38s ease-in-out infinite alternate;
+}
+
+.glow-blob--c {
+  width: 52vw;
+  height: 52vw;
+  min-width: 340px;
+  min-height: 340px;
+  bottom: -24vw;
+  left: 22vw;
+  background: radial-gradient(circle, var(--halo-blue) 0%, transparent 70%);
+  animation: blob-c 44s ease-in-out infinite alternate;
+}
+
+@keyframes blob-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(7vw, 6vh, 0) scale(1.14);
+  }
+}
+@keyframes blob-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.08);
+  }
+  to {
+    transform: translate3d(-8vw, 9vh, 0) scale(1);
+  }
+}
+@keyframes blob-c {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vw, -7vh, 0) scale(1.12);
+  }
+}
+
+/* ---------- 16.2 跟随光标的光晕 ----------
+ * 默认隐藏，只有脚本确认是「精确指针设备」时才加 .is-active 点亮，
+ * 免得触屏设备上留一团不动光斑在角落。
+ */
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 460px;
+  height: 460px;
+  margin: -230px 0 0 -230px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  background: radial-gradient(circle, var(--halo-sky) 0%, transparent 62%);
+  transition: opacity 0.8s ease;
+  will-change: transform;
+}
+.cursor-glow.is-active {
+  opacity: 0.6;
+}
+
+/* ---------- 16.3 滚动入场 ----------
+ * 进入视口才播，一片片浮上来。动画用 animation 而不是 transition，
+ * 免得跟卡片自身的 hover transition 打架；
+ * 播完由脚本加 .reveal-done 摘掉动画，hover 手感才能回到原样。
+ */
+.has-js [data-animate] {
+  opacity: 0;
+}
+
+.has-js [data-animate].in-view {
+  animation: reveal-up 0.72s var(--ease-spring) var(--reveal-delay, 0ms) both;
+}
+
+.has-js [data-animate].reveal-done {
+  opacity: 1;
+  animation: none;
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- 16.4 聚光卡片 ----------
+ * 一团柔光跟着光标在卡片上走（--mx / --my 由脚本实时写入），
+ * 就是 Aceternity UI「spotlight card」那套做法，纯 CSS 实现。
+ */
+[data-spotlight] {
+  position: relative;
+}
+
+[data-spotlight]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background: radial-gradient(
+    280px circle at var(--mx, 50%) var(--my, 0%),
+    var(--halo-sky) 0%,
+    transparent 68%
+  );
+}
+
+[data-spotlight]:hover::after {
+  opacity: 1;
+}
+
+/* 落叶 / 竹叶飘落层
+ * 两层复合运动：外层管垂直下落，内层管摇摆 + 自转 + 翻面。
+ * 想调「落叶密度」，改 LeafFall.astro 里 Array.from 的长度即可。
+ */
+.leaf-layer {
   position: fixed;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
   z-index: 2;
 }
-.sakura-petal {
+
+.leaf {
   position: absolute;
-  top: -20px;
-  border-radius: 60% 10% 60% 10%;
-  background: linear-gradient(135deg, rgba(255, 158, 192, 0.9), rgba(255, 107, 157, 0.55));
-  animation: fall linear infinite;
+  top: -10vh;
+  width: var(--w);
+  height: calc(var(--w) * 1.55);
+  animation: leaf-fall var(--dur) linear var(--delay) infinite;
+  will-change: transform, opacity;
 }
 
-@keyframes fall {
+.leaf-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 14%;
+  animation: leaf-sway 6s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.leaf-inner svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 叶色 —— 四种点缀色，小面积出现，整体画面依旧是白与蓝的底 */
+.hue-0 {
+  color: var(--sun);
+}
+.hue-1 {
+  color: var(--amber);
+}
+.hue-2 {
+  color: var(--mint);
+}
+.hue-3 {
+  color: var(--sky);
+}
+
+@keyframes leaf-fall {
   0% {
-    transform: translate3d(0, -10vh, 0) rotate(0deg);
+    transform: translate3d(0, -12vh, 0);
     opacity: 0;
   }
-  10% {
-    opacity: 0.9;
+  6% {
+    opacity: var(--op);
+  }
+  86% {
+    opacity: var(--op);
   }
   100% {
-    transform: translate3d(80px, 108vh, 0) rotate(420deg);
+    transform: translate3d(var(--drift), 116vh, 0);
     opacity: 0;
+  }
+}
+
+/* 摇摆 + 自转 + 沿 Y 轴翻面：翻面会让叶片在视觉上「变窄」，
+   正好模拟叶子被风翻转的瞬间 */
+@keyframes leaf-sway {
+  0% {
+    transform: translateX(-18px) rotate(-30deg) rotateY(0deg) scale(0.94);
+  }
+  50% {
+    transform: translateX(2px) rotate(4deg) rotateY(168deg) scale(1);
+  }
+  100% {
+    transform: translateX(18px) rotate(30deg) rotateY(336deg) scale(0.94);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sakura-layer {
+  .leaf-layer,
+  .glow-field,
+  .cursor-glow {
     display: none;
+  }
+  /* 入场动画关掉后，初始隐藏必须一并取消，否则内容会永远看不见 */
+  .has-js [data-animate] {
+    opacity: 1 !important;
+    animation: none !important;
   }
   * {
     animation-duration: 0.01ms !important;
@@ -1281,11 +2005,40 @@ html.day-theme .theme-toggle-btn .icon-moon {
   .about-grid .about-side {
     order: 2;
   }
+  /* Hero 从左右布局收成上下，轨道视觉居中收窄 */
+  .hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .hero-orbit {
+    margin: 0 auto;
+    max-width: 250px;
+  }
+  .pillars {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
   .web-wrapper {
     padding: 0 16px 60px;
+  }
+  /* 窄屏收起 Hero 的大留白，品牌徽章也收掉，给导航腾空间 */
+  .hero {
+    padding: 38px 24px;
+    margin: 22px 0 32px;
+  }
+  .hero-title {
+    letter-spacing: 0;
+  }
+  .hero-stats {
+    gap: 16px;
+  }
+  .pillars {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .nav-logo-badge {
+    display: none;
   }
   .navbar-inner {
     padding: 12px 16px;
