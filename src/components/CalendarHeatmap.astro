@@ -1,0 +1,103 @@
+---
+/**
+ * 日历热力图 —— 首页侧边栏那块「类似 GitHub 贡献图」的卡片
+ * 完全由文章的真实发布日期生成：发得越多，格子颜色越深。
+ * 下面再列出最近几篇，点进去就是文章。
+ */
+import { withBase } from '@/utils/url';
+import { formatDate } from '@/utils/posts';
+
+interface PostLite {
+  id: string;
+  title: string;
+  date: Date;
+}
+
+interface Props {
+  posts: PostLite[];
+  /** 热力图显示多少周 */
+  weeks?: number;
+}
+
+const { posts, weeks = 26 } = Astro.props;
+
+/** 把日期归一到本地时区的 YYYY-MM-DD */
+const key = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** 统计每天发了几篇 */
+const perDay = new Map<string, number>();
+for (const p of posts) {
+  const k = key(new Date(p.date));
+  perDay.set(k, (perDay.get(k) ?? 0) + 1);
+}
+
+// 从「本周日」往前推，保证列对齐到周
+const today = new Date();
+today.setHours(0, 0, 0, 0);
+const cursor = new Date(today);
+cursor.setDate(cursor.getDate() - today.getDay() - (weeks - 1) * 7);
+
+const cells: { k: string; count: number; future: boolean }[] = [];
+for (let i = 0; i < weeks * 7; i++) {
+  const d = new Date(cursor);
+  d.setDate(cursor.getDate() + i);
+  const k = key(d);
+  cells.push({ k, count: perDay.get(k) ?? 0, future: d > today });
+}
+
+// 日期范围文字
+const first = cells[0].k;
+const last = cells[cells.length - 1].k;
+const rangeText = `${first.slice(2).replace(/-/g, '/')} – ${last.slice(2).replace(/-/g, '/')}`;
+
+const totalInRange = cells.reduce((a, c) => a + c.count, 0);
+
+/** 最近三篇（posts 已按时间倒序传入） */
+const recent = posts.slice(0, 3);
+
+const level = (n: number) => (n <= 0 ? '' : n === 1 ? 'lv1' : n === 2 ? 'lv2' : 'lv3');
+---
+
+<div class="widget-card calendar-widget">
+  <div class="calendar-header">
+    <h3 class="sidebar-title">写作轨迹</h3>
+    <span class="cal-range">{rangeText}</span>
+  </div>
+
+  <div class="cal-heatmap" role="img" aria-label={`最近 ${weeks} 周的写作分布`}>
+    {
+      cells.map((c) => (
+        <div
+          class:list={['cal-cell', level(c.count)]}
+          style={c.future ? 'opacity:.25' : undefined}
+          title={c.count > 0 ? `${c.k}　${c.count} 篇` : c.k}
+        />
+      ))
+    }
+  </div>
+
+  <div class="cal-legend">
+    <span>少</span>
+    <div class="cal-cell"></div>
+    <div class="cal-cell lv1"></div>
+    <div class="cal-cell lv2"></div>
+    <div class="cal-cell lv3"></div>
+    <span>多</span>
+  </div>
+
+  <div class="cal-activity-list">
+    <div class="cal-activity-item" style="color:var(--muted)">
+      <time>合计</time>
+      <span style="color:var(--muted)">最近 {weeks} 周共发布 {totalInRange} 篇</span>
+    </div>
+    {
+      recent.map((p) => (
+        <a class="cal-activity-item" href={withBase(`/post/${p.id}/`)}>
+          <time>{formatDate(new Date(p.date)).slice(0, 10)}</time>
+          <span>{p.title}</span>
+        </a>
+      ))
+    }
+  </div>
+</div>

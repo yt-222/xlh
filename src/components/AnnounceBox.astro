@@ -1,0 +1,20 @@
+---
+/**
+ * 公告框 —— 首页侧边栏的一条通知，文案在 src/config.ts 的 ANNOUNCEMENT 里配。
+ * 留空就整块不渲染（不会留一个空盒子）。
+ */
+import { ANNOUNCEMENT } from '@/config';
+
+const text = ANNOUNCEMENT.trim();
+---
+
+{
+  text && (
+    <div class="announce-box">
+      <span class="announce-icon" aria-hidden="true">
+        📢
+      </span>
+      <div>{text}</div>
+    </div>
+  )
+}

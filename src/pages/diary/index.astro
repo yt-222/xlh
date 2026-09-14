@@ -1,0 +1,55 @@
+---
+/**
+ * 碎片日记
+ * 数据来自 src/data/diary.ts（本地数组，改完重新构建即可）。
+ * 想做成动态的（打开页面就能发），朋友那套是接 Cloudflare D1 + Functions，
+ * 页面里把 import 换成 fetch('/api/diary') 就行，数据结构完全一致。
+ */
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import Footer from '@components/Footer.astro';
+import { DIARY } from '@/data/diary';
+
+const entries = [...DIARY].sort((a, b) => b.date.localeCompare(a.date));
+---
+
+<Layout title="碎片日记" description="没什么结构的一些记录。">
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <div class="diary-container">
+          <div class="diary-header">
+            <h1 class="gallery-title">碎片日记</h1>
+            <p class="gallery-subtitle">没什么结构的一些记录</p>
+          </div>
+
+          {
+            entries.length > 0 ? (
+              <div class="diary-feed">
+                {entries.map((e) => (
+                  <div class="diary-item">
+                    <div class="diary-meta">
+                      <time>{e.date}</time>
+                      {e.mood && <span class="diary-mood">{e.mood}</span>}
+                    </div>
+                    <div class="diary-text">{e.text}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div class="empty-hint">
+                <strong>还没有日记</strong>
+                打开 <code>src/data/diary.ts</code>，往 <code>DIARY</code> 数组里加一条即可，
+                每条只要 <code>date</code> 和 <code>text</code> 两个字段，<code>mood</code> 可选。
+              </div>
+            )
+          }
+        </div>
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>

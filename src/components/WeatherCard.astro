@@ -1,0 +1,212 @@
+---
+/**
+ * 天气卡 —— 首页侧边栏顶部那块
+ *
+ * 数据源：Open-Meteo（https://open-meteo.com）
+ *   - 完全免费、不需要注册、不需要 API key
+ *   - 全程浏览器端请求，所以纯静态托管也能用；失败只显示提示，不影响其他内容
+ *
+ * 地点由 config.ts 的 SITE.latitude / SITE.longitude 决定（现在是武汉江夏区）。
+ * 为什么不按城市名解析？实测 Open-Meteo 的城市库里没有「江夏区」，
+ * 搜「江夏」会返回广东清远、安徽合肥、江西赣州那几个同名小地方 —— 会定到几百公里外。
+ * SITE.cityLabel 只是卡片上显示的牌子，不参与定位。
+ */
+import { SITE } from '@/config';
+
+const label = SITE.cityLabel.trim();
+const lat = SITE.latitude.trim();
+const lon = SITE.longitude.trim();
+const city = SITE.city.trim();
+const hasCoords = lat.length > 0 && lon.length > 0;
+const enabled = hasCoords || city.length > 0;
+---
+
+<div
+  class="widget-card weather-card"
+  id="weather-card"
+  data-spotlight
+  data-label={label || '坐标定位'}
+  data-lat={lat}
+  data-lon={lon}
+  data-city={city}
+>
+  <div class="uw-top-bar">
+    <span class="uw-date" id="uw-date">--</span>
+    <span class="uw-city-pill" id="uw-city">{label || '坐标定位'}</span>
+    <span class="uw-clock" id="uw-clock">--:--:--</span>
+  </div>
+
+  {
+    enabled ? (
+      <div id="uw-body">
+        <div class="uw-loading">
+          <span class="uw-loading-dot" />
+          <span class="uw-loading-dot" />
+          <span class="uw-loading-dot" />
+        </div>
+      </div>
+    ) : (
+      <div class="uw-error">
+        还没设置地点。打开 <code>src/config.ts</code>，填 <code>SITE.latitude</code> 与
+        <code>SITE.longitude</code> 两个坐标即可（比填城市名稳，那个接口认不出区县名）。
+      </div>
+    )
+  }
+</div>
+
+<script>
+  /* ---------- 时钟与日期：不依赖网络，先跑起来 ---------- */
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
+
+  function tick() {
+    const d = new Date();
+    const dateEl = document.getElementById('uw-date');
+    const clockEl = document.getElementById('uw-clock');
+    if (dateEl) dateEl.textContent = `${d.getMonth() + 1}月${d.getDate()}日 周${WEEK[d.getDay()]}`;
+    if (clockEl)
+      clockEl.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  /* ---------- WMO 天气代码 → emoji + 中文 ---------- */
+  const WMO: Record<number, [string, string, string?]> = {
+    0: ['☀️', '晴', '🌙'],
+    1: ['🌤️', '少云', '🌙'],
+    2: ['⛅', '多云', '☁️'],
+    3: ['☁️', '阴', '☁️'],
+    45: ['🌫️', '有雾', '🌫️'],
+    48: ['🌫️', '雾凇', '🌫️'],
+    51: ['🌦️', '毛毛雨', '🌦️'],
+    53: ['🌦️', '小雨', '🌦️'],
+    55: ['🌦️', '中雨', '🌧️'],
+    56: ['🌧️', '冻雨', '🌧️'],
+    57: ['🌧️', '冻雨', '🌧️'],
+    61: ['🌦️', '小雨', '🌦️'],
+    63: ['🌧️', '中雨', '🌧️'],
+    65: ['🌧️', '大雨', '🌧️'],
+    66: ['🌧️', '冻雨', '🌧️'],
+    67: ['🌧️', '冻雨', '🌧️'],
+    71: ['🌨️', '小雪', '🌨️'],
+    73: ['🌨️', '中雪', '🌨️'],
+    75: ['❄️', '大雪', '❄️'],
+    77: ['🌨️', '雪粒', '🌨️'],
+    80: ['🌦️', '阵雨', '🌦️'],
+    81: ['🌧️', '阵雨', '🌧️'],
+    82: ['⛈️', '强阵雨', '⛈️'],
+    85: ['🌨️', '阵雪', '🌨️'],
+    86: ['🌨️', '阵雪', '🌨️'],
+    95: ['⛈️', '雷阵雨', '⛈️'],
+    96: ['⛈️', '雷暴冰雹', '⛈️'],
+    99: ['⛈️', '强雷暴', '⛈️'],
+  };
+
+  /** 只取 ISO 时间里的 HH:MM */
+  const hhmm = (iso?: string) => (iso && iso.length >= 16 ? iso.slice(11, 16) : '--');
+
+  /** 城市名 → 经纬度（只在没配坐标时才走这条路） */
+  async function geocode(name: string) {
+    const candidates = [name, name + '市', name.replace(/市$/, '')].filter(
+      (v, i, arr) => v.length > 0 && arr.indexOf(v) === i
+    );
+    for (const n of candidates) {
+      const url =
+        'https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&format=json&name=' +
+        encodeURIComponent(n);
+      const geo = await (await fetch(url)).json();
+      const place = geo?.results?.[0];
+      if (place) return { lat: place.latitude, lon: place.longitude, label: place.name };
+    }
+    return null;
+  }
+
+  async function loadWeather(lat: string, lon: string, city: string) {
+    const body = document.getElementById('uw-body');
+    const pill = document.getElementById('uw-city');
+    if (!body) return;
+
+    try {
+      let latitude: number;
+      let longitude: number;
+
+      if (lat && lon) {
+        latitude = Number(lat);
+        longitude = Number(lon);
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+          throw new Error('config 里的经纬度不是有效数字');
+        }
+      } else {
+        const place = await geocode(city);
+        if (!place) throw new Error(`没查到「${city}」，换个写法或直接填经纬度`);
+        latitude = place.lat;
+        longitude = place.lon;
+        if (pill && place.label) pill.textContent = place.label;
+      }
+
+      const url =
+        `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}` +
+        '&current=temperature_2m,weather_code,apparent_temperature,relative_humidity_2m,wind_speed_10m,is_day' +
+        '&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset' +
+        '&timezone=auto&forecast_days=1';
+      const wx = await (await fetch(url)).json();
+
+      const cur = wx?.current;
+      if (!cur) throw new Error('天气数据为空');
+
+      const code = cur.weather_code as number;
+      const isDay = cur.is_day !== 0;
+      const entry = WMO[code];
+      const icon = entry ? (isDay ? entry[0] : entry[2] || entry[0]) : '🌡️';
+      const text = entry ? entry[1] : '未知';
+
+      const temp = Math.round(cur.temperature_2m);
+      const feels = Math.round(cur.apparent_temperature);
+      const hi = Math.round(wx.daily?.temperature_2m_max?.[0] ?? 0);
+      const lo = Math.round(wx.daily?.temperature_2m_min?.[0] ?? 0);
+      const humidity = Math.round(cur.relative_humidity_2m ?? 0);
+      const wind = Math.round((cur.wind_speed_10m ?? 0) * 10) / 10;
+      const sunrise = hhmm(wx.daily?.sunrise?.[0]);
+      const sunset = hhmm(wx.daily?.sunset?.[0]);
+
+      body.innerHTML = `
+        <div class="uw-main">
+          <div class="uw-icon">${icon}</div>
+          <div class="uw-main-text">
+            <div class="uw-temp">${temp}<span class="uw-deg">°</span></div>
+            <div class="uw-desc">${text} · 体感 ${feels}°</div>
+            <div class="uw-range">今日 ${lo}° ~ ${hi}°</div>
+          </div>
+        </div>
+        <div class="uw-details">
+          <div class="uw-detail">
+            <span class="uw-detail-label">湿度</span>
+            <span class="uw-detail-value">${humidity}%</span>
+          </div>
+          <div class="uw-detail">
+            <span class="uw-detail-label">风速</span>
+            <span class="uw-detail-value">${wind} km/h</span>
+          </div>
+          <div class="uw-detail">
+            <span class="uw-detail-label">日出</span>
+            <span class="uw-detail-value">${sunrise}</span>
+          </div>
+          <div class="uw-detail">
+            <span class="uw-detail-label">日落</span>
+            <span class="uw-detail-value">${sunset}</span>
+          </div>
+        </div>`;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : '未知错误';
+      body.innerHTML = `<div class="uw-error">天气获取失败：${msg}<br />（页面直接请求公开接口，失败也不影响其他内容）</div>`;
+    }
+  }
+
+  const card = document.getElementById('weather-card');
+  if (card) {
+    const lat = card.dataset.lat?.trim() ?? '';
+    const lon = card.dataset.lon?.trim() ?? '';
+    const city = card.dataset.city?.trim() ?? '';
+    if ((lat && lon) || city) loadWeather(lat, lon, city);
+  }
+</script>

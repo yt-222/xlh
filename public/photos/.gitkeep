@@ -1,0 +1,13 @@
+放照片的目录。
+
+每个子目录 = 一个相册，目录名就是相册名：
+
+  public/photos/武汉江边/01.jpg
+  public/photos/武汉江边/02.jpg
+  public/photos/随手拍/xxx.png
+
+规则：
+- 支持 jpg / jpeg / png / webp / gif / avif / svg
+- 相册封面自动取目录里排序第一张
+- 想加相册说明和日期，去 src/config.ts 的 ALBUMS 里按目录名写一条，不写也能用
+- 这个文件本身不是图片，不会被当成照片

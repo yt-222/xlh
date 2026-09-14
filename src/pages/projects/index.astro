@@ -1,0 +1,101 @@
+---
+/**
+ * 项目
+ * 数据全部来自 src/config.ts 的 PROJECTS 数组。
+ * 标了 featured: true 的那一个会显示在最上方的大卡片里，其余进网格。
+ * 数组是空的（现在就是），页面会显示一句引导和填写格式。
+ */
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import Footer from '@components/Footer.astro';
+import { PROJECTS } from '@/config';
+
+const featured = PROJECTS.find((p) => p.featured);
+const rest = PROJECTS.filter((p) => p !== featured);
+---
+
+<Layout title="项目" description="做过的东西都放在这里。">
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <div class="page-header">
+          <h1 class="page-title">项目</h1>
+          <p class="page-subtitle">做过的、正在做的、想做的</p>
+        </div>
+
+        {
+          PROJECTS.length === 0 ? (
+            <div class="empty-hint">
+              <strong>还没有登记项目</strong>
+              打开 <code>src/config.ts</code>，往 <code>PROJECTS</code> 数组里加一条即可，
+              每条的字段是
+              <code>name</code> <code>desc</code> <code>tags</code> <code>icon</code>{' '}
+              <code>href</code> <code>featured</code>。<br />
+              标了 <code>featured: true</code> 的那一个会显示在上方大卡片里，其余排成网格；<br />
+              <code>href</code> 留空的话卡片就不可点。
+            </div>
+          ) : (
+            <>
+              {featured && (
+                <div class="proj-featured animate-in">
+                  <div class="proj-feat-content">
+                    <span class="proj-feat-badge">★ Featured</span>
+                    <h2 class="proj-feat-name">{featured.name}</h2>
+                    <p class="proj-feat-desc">{featured.desc}</p>
+                    <div class="proj-tags">
+                      {featured.tags.map((t) => (
+                        <span class="chip">{t}</span>
+                      ))}
+                    </div>
+                    {featured.href && (
+                      <div class="pagination" style="margin-top:18px">
+                        <a href={featured.href} class="page-link" target="_blank" rel="noopener">
+                          去看看 →
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                  <div class="proj-feat-visual">{featured.icon}</div>
+                </div>
+              )}
+
+              {rest.length > 0 && (
+                <div class="proj-grid">
+                  {rest.map((p) =>
+                    p.href ? (
+                      <a class="proj-card" href={p.href} target="_blank" rel="noopener">
+                        <div class="proj-icon">{p.icon}</div>
+                        <div class="proj-name">{p.name}</div>
+                        <div class="proj-desc">{p.desc}</div>
+                        <div class="proj-tags">
+                          {p.tags.map((t) => (
+                            <span class="chip">{t}</span>
+                          ))}
+                        </div>
+                      </a>
+                    ) : (
+                      <div class="proj-card">
+                        <div class="proj-icon">{p.icon}</div>
+                        <div class="proj-name">{p.name}</div>
+                        <div class="proj-desc">{p.desc}</div>
+                        <div class="proj-tags">
+                          {p.tags.map((t) => (
+                            <span class="chip">{t}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </>
+          )
+        }
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>
