@@ -1,0 +1,255 @@
+---
+/**
+ * 图片灯箱
+ *
+ * 参考 momonyako 那站的 fancybox，但没引第三方库 ——
+ * fancybox 光 CSS 就 32KB，而这里真正需要的只有四件事：
+ * 放大查看、左右切换、键盘操作、缩略图定位。
+ *
+ * 性能上的两个关键决定：
+ *   1. 关着的时候 <img> 不带 src —— 不打开就绝不下载原图；
+ *   2. 切换时只预加载「当前 ±1」，不为 60 张图同时发请求。
+ *
+ * 用法：页面里给可点元素加 data-lb-index="序号"，再引入本组件即可。
+ *       组件会自动接管点击事件（事件委托，不用一个个绑）。
+ */
+interface Photo {
+  /** 唯一标识（预加载去重用） */
+  slug: string;
+  /** 缩略图（小文件），给底部缩略图条用 */
+  thumb: string;
+  /** 大图 · avif（现代浏览器优先） */
+  avif: string;
+  /** 大图 · webp（兜底） */
+  webp: string;
+  /** 无障碍描述 */
+  alt?: string;
+}
+
+interface Props {
+  photos: Photo[];
+  /** 触发器选择器，默认 [data-lb-index] */
+  triggerSelector?: string;
+}
+
+const { photos, triggerSelector = '[data-lb-index]' } = Astro.props;
+---
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="图片查看" hidden>
+  <div class="lightbox__bar">
+    <span>
+      <span class="lightbox__counter" id="lbCounter">1 / 1</span>
+      <span class="lightbox__title" id="lbTitle"></span>
+    </span>
+    <button class="lightbox__btn" id="lbClose" type="button" aria-label="关闭（Esc）" title="关闭（Esc）">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+    </button>
+  </div>
+
+  <div class="lightbox__stage">
+    <button
+      class="lightbox__btn lightbox__nav lightbox__nav--prev"
+      id="lbPrev"
+      type="button"
+      aria-label="上一张（←）"
+      title="上一张（←）"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg>
+    </button>
+
+    <!-- 用 <picture> 而不是单个 <img>：支持 avif 的浏览器走 avif（更小），
+         其余回落 webp。两者都不支持时 <img> 的 src 仍是 webp，兼容性不丢。 -->
+    <picture>
+      <source id="lbAvif" type="image/avif" />
+      <img class="lightbox__img" id="lbImg" alt="" decoding="async" />
+    </picture>
+
+    <button
+      class="lightbox__btn lightbox__nav lightbox__nav--next"
+      id="lbNext"
+      type="button"
+      aria-label="下一张（→）"
+      title="下一张（→）"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+    </button>
+  </div>
+
+  <div class="lightbox__thumbs" id="lbThumbs"></div>
+</div>
+
+<script is:inline define:vars={{ photos, triggerSelector }}>
+  (function () {
+    var items = photos || [];
+    if (!items.length) return;
+
+    var box = document.getElementById('lightbox');
+    var img = document.getElementById('lbImg');
+    var avif = document.getElementById('lbAvif');
+    var counter = document.getElementById('lbCounter');
+    var title = document.getElementById('lbTitle');
+    var thumbs = document.getElementById('lbThumbs');
+    var btnPrev = document.getElementById('lbPrev');
+    var btnNext = document.getElementById('lbNext');
+    var btnClose = document.getElementById('lbClose');
+    if (!box || !img) return;
+
+    var index = 0;
+    var opened = false;
+    /** 已经发过请求的图片地址，避免重复加载 */
+    var warmed = {};
+
+    /* ---------- 缩略图条（只在有图时建一次） ---------- */
+    var thumbEls = [];
+    items.forEach(function (p, i) {
+      var t = document.createElement('img');
+      t.src = p.thumb;
+      t.alt = p.alt || '';
+      t.loading = 'lazy';
+      t.decoding = 'async';
+      t.dataset.i = String(i);
+      t.addEventListener('click', function () {
+        show(i);
+      });
+      thumbs.appendChild(t);
+      thumbEls.push(t);
+    });
+
+    /** 只预加载当前这张的前后各一张，别把 60 张全拉下来 */
+    function warm(i) {
+      [i - 1, i + 1].forEach(function (n) {
+        var p = items[(n + items.length) % items.length];
+        if (!p || warmed[p.slug]) return;
+        warmed[p.slug] = 1;
+        var pre = new Image();
+        /* srcset + src 一起给，浏览器会按自己的格式支持挑一个，
+           和 <picture> 的选择逻辑一致 —— 不必自己探测 avif 支持 */
+        if (p.avif) pre.srcset = p.avif;
+        pre.src = p.webp;
+      });
+    }
+
+    function show(i) {
+      index = (i + items.length) % items.length;
+      var p = items[index];
+
+      /* avif 先设（支持的浏览器直接命中），img.src 作为兜底 */
+      if (avif && p.avif) avif.srcset = p.avif;
+      img.src = p.webp;
+      img.alt = p.alt || '';
+      counter.textContent = index + 1 + ' / ' + items.length;
+      title.textContent = p.alt || '';
+      img.classList.remove('lightbox__fail');
+
+      thumbEls.forEach(function (t, n) {
+        t.classList.toggle('active', n === index);
+      });
+      /* 让当前缩略图滚进可视范围 */
+      var cur = thumbEls[index];
+      if (cur && cur.scrollIntoView) {
+        cur.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+      }
+
+      warm(index);
+    }
+
+    /* 大图加载失败时给一句人话，而不是留个破图标 */
+    img.addEventListener('error', function () {
+      img.classList.add('lightbox__fail');
+      title.textContent = '这张图加载失败，可能已被移除';
+    });
+
+    function open(i) {
+      opened = true;
+      box.hidden = false;
+      /* hidden 摘掉后要等一帧再加 .open，否则过渡不触发 */
+      requestAnimationFrame(function () {
+        box.classList.add('open');
+      });
+      document.documentElement.classList.add('lightbox-locked');
+      show(i);
+      btnClose.focus();
+    }
+
+    function close() {
+      opened = false;
+      box.classList.remove('open');
+      document.documentElement.classList.remove('lightbox-locked');
+      /* 等淡出结束再真正隐藏，顺带把大图卸掉释放内存 */
+      setTimeout(function () {
+        if (opened) return;
+        box.hidden = true;
+        img.removeAttribute('src');
+        if (avif) avif.removeAttribute('srcset');
+      }, 300);
+    }
+
+    /* ---------- 事件委托：以后动态加的照片也能点开 ---------- */
+    document.addEventListener('click', function (e) {
+      var el = e.target.closest(triggerSelector);
+      if (!el) return;
+      var i = Number(el.dataset.lbIndex);
+      if (!Number.isFinite(i)) return;
+      e.preventDefault();
+      open(i);
+    });
+
+    btnPrev.addEventListener('click', function () {
+      show(index - 1);
+    });
+    btnNext.addEventListener('click', function () {
+      show(index + 1);
+    });
+    btnClose.addEventListener('click', close);
+
+    /* 点空白处关闭（点在图片或按钮上不关） */
+    box.addEventListener('click', function (e) {
+      if (e.target === box || e.target.classList.contains('lightbox__stage')) close();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (!opened) return;
+      if (e.key === 'Escape') close();
+      else if (e.key === 'ArrowLeft') show(index - 1);
+      else if (e.key === 'ArrowRight') show(index + 1);
+    });
+
+    /* 移动端左右滑动切换 */
+    var touchX = null;
+    box.addEventListener(
+      'touchstart',
+      function (e) {
+        touchX = e.changedTouches[0].clientX;
+      },
+      { passive: true }
+    );
+    box.addEventListener(
+      'touchend',
+      function (e) {
+        if (touchX === null) return;
+        var dx = e.changedTouches[0].clientX - touchX;
+        touchX = null;
+        if (Math.abs(dx) < 45) return;
+        show(dx > 0 ? index - 1 : index + 1);
+      },
+      { passive: true }
+    );
+  })();
+</script>
