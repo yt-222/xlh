@@ -1,0 +1,63 @@
+---
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import HeroBanner from '@components/HeroBanner.astro';
+import PostCard from '@components/PostCard.astro';
+import Sidebar from '@components/Sidebar.astro';
+import Footer from '@components/Footer.astro';
+import { SITE } from '@/config';
+import { withBase } from '@/utils/url';
+import { getAllPosts, collectTags, collectCategories } from '@/utils/content';
+
+const posts = await getAllPosts();
+const tags = collectTags(posts);
+const categories = collectCategories(posts);
+const recent = posts.slice(0, SITE.postsPerPage);
+---
+
+<Layout>
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+        <HeroBanner postCount={posts.length} tagCount={tags.length} />
+
+        <div class="layout-main">
+          <main>
+            <h2 class="section-heading">
+              最新文章 <span class="count">/{String(recent.length).padStart(2, '0')}</span>
+            </h2>
+
+            {
+              recent.length > 0 ? (
+                <div class="post-list">
+                  {recent.map((post) => (
+                    <PostCard post={post} />
+                  ))}
+                </div>
+              ) : (
+                <div class="empty-state">
+                  还没有文章，去 <code>src/content/blog/</code> 里新建一个 .md 文件就能看到啦
+                </div>
+              )
+            }
+
+            {
+              posts.length > recent.length && (
+                <div class="pagination">
+                  <a href={withBase('/archive/')} class="page-link">
+                    查看全部 {posts.length} 篇 →
+                  </a>
+                </div>
+              )
+            }
+          </main>
+
+          <Sidebar postCount={posts.length} categories={categories} tags={tags} />
+        </div>
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>

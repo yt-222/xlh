@@ -1,0 +1,24 @@
+---
+/** 樱花 / 花瓣飘落效果，纯 CSS 动画，跟随主题变色 */
+const PETALS = Array.from({ length: 14 }, (_, i) => {
+  const size = 8 + ((i * 7) % 9);
+  return {
+    left: ((i * 37) % 100).toFixed(1),
+    size,
+    duration: 11 + ((i * 3) % 9),
+    delay: (i * 0.9).toFixed(1),
+    opacity: (0.35 + ((i % 5) * 0.12)).toFixed(2),
+  };
+});
+---
+
+<div class="sakura-layer" aria-hidden="true">
+  {
+    PETALS.map((p) => (
+      <span
+        class="sakura-petal"
+        style={`left:${p.left}%;width:${p.size}px;height:${p.size}px;opacity:${p.opacity};animation-duration:${p.duration}s;animation-delay:${p.delay}s;`}
+      />
+    ))
+  }
+</div>

@@ -1,0 +1,37 @@
+---
+import { SITE } from '@/config';
+
+interface Props {
+  postCount: number;
+  tagCount: number;
+}
+
+const { postCount, tagCount } = Astro.props;
+---
+
+<section class="hero">
+  <h1 class="hero-title">{SITE.title}</h1>
+  <p class="hero-subtitle" id="heroSubtitle">{SITE.taglines[0]}</p>
+
+  <div class="hero-stats">
+    <span class="hero-stat"><strong>{postCount}</strong>篇文章</span>
+    <span class="hero-stat"><strong>{tagCount}</strong>个标签</span>
+    <span class="hero-stat"><strong>∞</strong>杯咖啡</span>
+  </div>
+</section>
+
+<script is:inline define:vars={{ taglines: [...SITE.taglines] }}>
+  (function () {
+    var el = document.getElementById('heroSubtitle');
+    if (!el || !taglines.length) return;
+    var idx = 0;
+    setInterval(function () {
+      el.style.opacity = '0';
+      setTimeout(function () {
+        idx = (idx + 1) % taglines.length;
+        el.textContent = taglines[idx];
+        el.style.opacity = '1';
+      }, 300);
+    }, 3600);
+  })();
+</script>

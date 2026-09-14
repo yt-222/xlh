@@ -1,0 +1,25 @@
+---
+import type { PostItem } from '@/utils/posts';
+import { withBase } from '@/utils/url';
+
+interface Props {
+  post: PostItem;
+}
+
+const { post } = Astro.props;
+---
+
+<a href={withBase(`/post/${post.id}/`)} class="post-card" data-animate>
+  <div class="post-card-head">
+    <span class="post-date">{post.dateText}</span>
+    {post.pinned && <span class="post-badge pinned">置顶</span>}
+  </div>
+
+  <h3 class="post-title">{post.title}</h3>
+  {post.excerpt && <p class="post-excerpt">{post.excerpt}</p>}
+
+  <div class="post-meta">
+    <span class="chip cat">{post.category}</span>
+    {post.tags.map((tag) => <span class="chip">#{tag}</span>)}
+  </div>
+</a>

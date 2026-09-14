@@ -1,0 +1,62 @@
+---
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import Footer from '@components/Footer.astro';
+import { getAllPosts, collectTags, collectCategories } from '@/utils/content';
+import { withBase } from '@/utils/url';
+
+const posts = await getAllPosts();
+const tags = collectTags(posts);
+const categories = collectCategories(posts);
+---
+
+<Layout title="标签" description="所有标签与分类">
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <div class="page-header">
+          <h1 class="page-title">标签</h1>
+          <p class="page-subtitle">共 {tags.length} 个标签 · {categories.length} 个分类</p>
+        </div>
+
+        {
+          categories.length > 0 && (
+            <section style="margin-bottom: 44px;">
+              <h2 class="section-heading">分类</h2>
+              <div class="tag-grid">
+                {categories.map((c) => (
+                  <a href={withBase(`/tags/${encodeURIComponent(c.name)}/`)} class="tag-card">
+                    <span class="tag-card-name">{c.name}</span>
+                    <span class="tag-card-count">{c.count} 篇</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          )
+        }
+
+        <section>
+          <h2 class="section-heading">全部标签</h2>
+          {
+            tags.length > 0 ? (
+              <div class="tag-grid">
+                {tags.map((t) => (
+                  <a href={withBase(`/tags/${encodeURIComponent(t.name)}/`)} class="tag-card">
+                    <span class="tag-card-name">{t.name}</span>
+                    <span class="tag-card-count">{t.count} 篇</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div class="empty-state">还没有标签，给文章加上 tags 字段就会出现</div>
+            )
+          }
+        </section>
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>

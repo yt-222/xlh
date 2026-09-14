@@ -1,0 +1,26 @@
+---
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import Footer from '@components/Footer.astro';
+import { withBase } from '@/utils/url';
+---
+
+<Layout title="404">
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <div class="empty-state" style="margin-top: 90px; padding: 90px 20px;">
+          <div style="font-family: var(--font-pixel); font-size: 4rem; color: var(--pink); line-height: 1;">
+            404
+          </div>
+          <p style="margin: 18px 0 26px;">这个页面好像走丢了 …</p>
+          <a href={withBase('/')} class="page-link" style="display: inline-grid;">← 回首页</a>
+        </div>
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>

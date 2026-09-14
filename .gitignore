@@ -1,0 +1,24 @@
+# 构建产物
+dist/
+.output/
+.astro/
+
+# 依赖
+node_modules/
+.pnpm-store/
+
+# 环境变量（千万不要提交）
+.env
+.env.*
+!.env.example
+
+# 编辑器 / 系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log
+npm-debug.log*

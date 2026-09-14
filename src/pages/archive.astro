@@ -1,0 +1,59 @@
+---
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import Footer from '@components/Footer.astro';
+import { getAllPosts } from '@/utils/content';
+import { withBase } from '@/utils/url';
+import type { PostItem } from '@/utils/posts';
+
+const posts = await getAllPosts();
+
+// 按年份分组
+const grouped = posts.reduce<Record<string, PostItem[]>>((acc, post) => {
+  const year = String(post.date.getFullYear());
+  (acc[year] ||= []).push(post);
+  return acc;
+}, {});
+
+const years = Object.keys(grouped).sort((a, b) => Number(b) - Number(a));
+const mdText = (date: Date) => `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+---
+
+<Layout title="归档" description="按时间浏览全部文章">
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <div class="page-header">
+          <h1 class="page-title">归档</h1>
+          <p class="page-subtitle">时间线 · 共 {posts.length} 篇文章</p>
+        </div>
+
+        {
+          years.length > 0 ? (
+            <div class="timeline">
+              {years.map((year) => (
+                <>
+                  <h2 class="timeline-year">{year}</h2>
+                  {grouped[year].map((post) => (
+                    <div class="timeline-item">
+                      <span class="timeline-date">{mdText(post.date)}</span>
+                      <a href={withBase(`/post/${post.id}/`)} class="timeline-link">
+                        {post.title}
+                      </a>
+                    </div>
+                  ))}
+                </>
+              ))}
+            </div>
+          ) : (
+            <div class="empty-state">还没有文章</div>
+          )
+        }
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>

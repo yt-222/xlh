@@ -1,0 +1,91 @@
+---
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import Footer from '@components/Footer.astro';
+import { getCollection, render, type CollectionEntry } from 'astro:content';
+import { formatDate } from '@/utils/posts';
+import { withBase } from '@/utils/url';
+
+export async function getStaticPaths() {
+  const entries = await getCollection('blog', ({ data }: CollectionEntry<'blog'>) => !data.draft);
+  const sorted = [...entries].sort(
+    (a: CollectionEntry<'blog'>, b: CollectionEntry<'blog'>) => b.data.date.valueOf() - a.data.date.valueOf()
+  );
+
+  return sorted.map((entry: CollectionEntry<'blog'>, i: number) => ({
+    params: { id: entry.id },
+    props: {
+      entry,
+      prev: sorted[i + 1] ?? null,
+      next: sorted[i - 1] ?? null,
+    },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<'blog'>;
+  prev: CollectionEntry<'blog'> | null;
+  next: CollectionEntry<'blog'> | null;
+}
+
+const { entry, prev, next } = Astro.props;
+const { Content } = await render(entry);
+const { title, date, cover, category, tags } = entry.data;
+---
+
+<Layout title={title} description={entry.data.excerpt}>
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <article class="article">
+          <a href={withBase('/')} class="back-btn">← 返回首页</a>
+
+          <div class="article-header">
+            {cover && <img src={withBase(cover)} alt={title} class="article-cover" />}
+            <h1 class="article-title">{title}</h1>
+            <div class="article-meta">
+              <span>{formatDate(date)}</span>
+              <span class="chip cat">{category}</span>
+              {tags.map((tag: string) => (
+                <a href={`/tags/${encodeURIComponent(tag)}/`} class="chip">
+                  #{tag}
+                </a>
+              ))}
+            </div>
+          </div>
+
+          <div class="markdown-body">
+            <Content />
+          </div>
+
+          {
+            (prev || next) && (
+              <nav class="post-nav">
+                {prev ? (
+                  <a href={withBase(`/post/${prev.id}/`)} class="post-nav-item">
+                    <div class="post-nav-label">← 上一篇</div>
+                    <div class="post-nav-title">{prev.data.title}</div>
+                  </a>
+                ) : (
+                  <span />
+                )}
+                {next ? (
+                  <a href={withBase(`/post/${next.id}/`)} class="post-nav-item next">
+                    <div class="post-nav-label">下一篇 →</div>
+                    <div class="post-nav-title">{next.data.title}</div>
+                  </a>
+                ) : (
+                  <span />
+                )}
+              </nav>
+            )
+          }
+        </article>
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>

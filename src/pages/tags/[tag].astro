@@ -1,0 +1,59 @@
+---
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import PostCard from '@components/PostCard.astro';
+import Footer from '@components/Footer.astro';
+import { getAllPosts } from '@/utils/content';
+import { withBase } from '@/utils/url';
+import type { PostItem } from '@/utils/posts';
+
+export async function getStaticPaths() {
+  const posts = await getAllPosts();
+  // 标签 + 分类都生成页面，两者用同一套模板
+  const names = new Set<string>();
+  posts.forEach((p) => {
+    p.tags.forEach((t) => names.add(t));
+    names.add(p.category);
+  });
+
+  return [...names].map((name) => ({
+    params: { tag: name },
+    props: {
+      name,
+      matched: posts.filter((p) => p.tags.includes(name) || p.category === name),
+    },
+  }));
+}
+
+interface Props {
+  name: string;
+  matched: PostItem[];
+}
+
+const { name, matched } = Astro.props;
+---
+
+<Layout title={`#${name}`} description={`标签 ${name} 下的全部文章`}>
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <div class="page-header">
+          <h1 class="page-title">#{name}</h1>
+          <p class="page-subtitle">共 {matched.length} 篇文章</p>
+        </div>
+
+        <div class="post-list">
+          {matched.map((post) => <PostCard post={post} />)}
+        </div>
+
+        <div class="pagination">
+          <a href={withBase('/tags/')} class="page-link">← 全部标签</a>
+        </div>
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>
