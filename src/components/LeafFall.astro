@@ -1,0 +1,79 @@
+---
+/**
+ * 落叶 / 竹叶飘落层 —— 取代原来的樱花特效
+ *
+ * 做法是「两层复合运动」，比单一 keyframes 自然很多：
+ *   外层 .leaf      只负责垂直下落（匀速、长周期）
+ *   内层 .leaf-inner 负责水平摇摆 + 自转 + 沿 Y 轴翻面（往复）
+ * 两层的周期不是整数倍关系，所以每片叶子的轨迹都不会重样，
+ * 看起来像被风推着打旋，而不是整齐地往下掉。
+ *
+ * 叶形用内联 SVG（柳叶 / 竹叶两种），颜色走 CSS 变量，
+ * 金黄、暖橙、青竹、薄荷四色小面积点缀 —— 正好是站点的「阳光感」点缀色。
+ */
+type Leaf = {
+  left: string;
+  size: number;
+  duration: number;
+  delay: number;
+  drift: number;
+  opacity: string;
+  kind: 'bamboo' | 'wide';
+  hue: number;
+  sway: string;
+};
+
+/** 用取模造伪随机：不用 Math.random，保证每次构建结果一致（SSG 需要确定性） */
+const LEAVES: Leaf[] = Array.from({ length: 16 }, (_, i) => {
+  const kind: Leaf['kind'] = i % 3 === 2 ? 'wide' : 'bamboo';
+  const duration = 15 + ((i * 5) % 12);
+  return {
+    left: (((i * 41 + 7) % 94) + 2).toFixed(1) + '%',
+    size: kind === 'wide' ? 15 + ((i * 5) % 9) : 13 + ((i * 7) % 7),
+    duration,
+    delay: Number((i * 1.35).toFixed(2)),
+    drift: (i % 2 === 0 ? 1 : -1) * (40 + ((i * 13) % 90)),
+    opacity: (0.3 + (i % 6) * 0.09).toFixed(2),
+    kind,
+    hue: i % 4,
+    /* 摇摆周期取下落周期的 0.36~0.48，避免两者整除后出现规整感 */
+    sway: (duration * (0.36 + (i % 4) * 0.04)).toFixed(1),
+  };
+});
+---
+
+<div class="leaf-layer" aria-hidden="true">
+  {
+    LEAVES.map((l) => (
+      <span
+        class="leaf"
+        style={`left:${l.left};--w:${l.size}px;--dur:${l.duration}s;--delay:${l.delay}s;--drift:${l.drift}px;--op:${l.opacity};`}
+      >
+        <span
+          class={`leaf-inner hue-${l.hue}`}
+          style={`animation-duration:${l.sway}s;animation-delay:-${(l.delay * 1.9).toFixed(2)}s;`}
+        >
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            {l.kind === 'wide' ? (
+              <path
+                d="M12 1.6c6.2 6 7.2 14.4 0 21.2-7.2-6.8-6.2-15.2 0-21.2Z"
+                fill="currentColor"
+              />
+            ) : (
+              <path
+                d="M12 1c4.6 6.6 5.6 14.6 0 22.4C6.4 15.6 7.4 7.6 12 1Z"
+                fill="currentColor"
+              />
+            )}
+            <path
+              d="M12 4.4v15.4"
+              stroke="var(--leaf-vein, rgba(255,255,255,0.5))"
+              stroke-width="0.65"
+              fill="none"
+            />
+          </svg>
+        </span>
+      </span>
+    ))
+  }
+</div>
