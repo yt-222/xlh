@@ -44,9 +44,13 @@ const iconSvg = (key: string) =>
             <div class="pillars">
               {PILLARS.map((p) => (
                 <div class="pillar-card" data-animate data-spotlight>
-                  <span class="pillar-icon" set:html={iconSvg(p.icon)} />
-                  <h3 class="pillar-title">{p.title}</h3>
-                  <p class="pillar-desc">{p.desc}</p>
+                  {/* 内嵌一层浅底面板 —— 「卡中卡」的层次感，参考 linxin 的三层嵌套卡片。
+                      不能再用 ::before/::after 实现：前者是顶部那条渐变线，后者是聚光。 */}
+                  <div class="pillar-inner">
+                    <span class="pillar-icon" set:html={iconSvg(p.icon)} />
+                    <h3 class="pillar-title">{p.title}</h3>
+                    <p class="pillar-desc">{p.desc}</p>
+                  </div>
                 </div>
               ))}
             </div>

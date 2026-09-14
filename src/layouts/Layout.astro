@@ -1,6 +1,9 @@
 ---
 import '../styles/global.css';
 import '../styles/components.css';
+/* 本次视觉增强层（嵌套玻璃卡片 / shimmer / 滚动提示 / 页头收缩 / 预加载屏 / 自适应网格）
+   —— 想整体回退只要删掉这一行 */
+import '../styles/enhance.css';
 import LeafFall from '@components/LeafFall.astro';
 import { SITE } from '@/config';
 import { withBase } from '@/utils/url';
@@ -49,11 +52,32 @@ const pageDesc = description || SITE.description;
              只有用户明确切到夜间时才会是 'night' */
           var saved = localStorage.getItem('gravity-theme');
           if (saved !== 'night') d.classList.add('day-theme');
+
+          /* 预加载屏只在本次会话第一次进入时播，之后跳页不再打扰 */
+          if (sessionStorage.getItem('gravity-preloaded')) {
+            d.classList.add('preloader-skip');
+          } else {
+            sessionStorage.setItem('gravity-preloaded', '1');
+          }
         } catch (e) {}
       })();
     </script>
   </head>
   <body>
+    <!-- 预加载屏：纯 CSS 自动退场（1.5s），不依赖 window.load ——
+         否则站内图片一多，load 被拖晚，反而拖慢感知速度 -->
+    <div class="preloader" id="preloader" aria-hidden="true">
+      <div class="preloader__inner">
+        <div class="preloader__buddy">
+          <span class="preloader__orbit"></span>
+          <span class="preloader__orbit preloader__orbit--2"></span>
+          <span class="preloader__core"></span>
+        </div>
+        <div class="preloader__dots"><i></i><i></i><i></i></div>
+        <div class="preloader__text">GRAVITY CABIN</div>
+      </div>
+    </div>
+
     <!-- 背景光斑：缓慢漂移的柔和色团，给纯色底加一层空气感 -->
     <div class="glow-field" aria-hidden="true">
       <span class="glow-blob glow-blob--a"></span>
@@ -69,7 +93,13 @@ const pageDesc = description || SITE.description;
     <slot />
 
     <button class="back-to-top" id="backToTop" aria-label="返回顶部" title="返回顶部">
+      <!-- 进度环：外圈随阅读进度增长（参考 gongyeqi 的 bottom-top） -->
+      <svg class="back-to-top__ring" viewBox="0 0 48 48" aria-hidden="true">
+        <circle class="ring-track" cx="24" cy="24" r="23"></circle>
+        <circle class="ring-value" cx="24" cy="24" r="23"></circle>
+      </svg>
       <svg
+        class="back-to-top__arrow"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -108,15 +138,26 @@ const pageDesc = description || SITE.description;
         }
       });
 
-      /* ================= 阅读进度 + 返回顶部 ================= */
+      /* ================= 阅读进度 + 返回顶部 + 页头收缩 ================= */
       const progress = document.getElementById('readingProgress');
       const backTop = document.getElementById('backToTop');
+      const navbar = document.querySelector<HTMLElement>('.navbar');
 
       function onScroll() {
         const top = window.scrollY;
         const height = document.documentElement.scrollHeight - window.innerHeight;
-        if (progress) progress.style.width = height > 0 ? (top / height) * 100 + '%' : '0%';
-        if (backTop) backTop.classList.toggle('show', top > 400);
+        const ratio = height > 0 ? Math.min(1, Math.max(0, top / height)) : 0;
+
+        if (progress) progress.style.width = ratio * 100 + '%';
+
+        if (backTop) {
+          backTop.classList.toggle('show', top > 400);
+          /* 进度环：JS 只写 0~1，具体画多少交给 CSS 的 stroke-dashoffset */
+          backTop.style.setProperty('--progress', ratio.toFixed(4));
+        }
+
+        /* 页头：滚过一点点就收紧、加深背景（参考 gongyeqi 的 header-effect） */
+        navbar?.classList.toggle('is-scrolled', top > 12);
       }
 
       window.addEventListener('scroll', onScroll, { passive: true });
@@ -125,6 +166,27 @@ const pageDesc = description || SITE.description;
 
       backTop?.addEventListener('click', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      /* ================= 预加载屏收尾 =================
+         CSS 已负责在固定时长后自动淡出（不依赖 window.load）；
+         这里只把淡出结束的图层彻底移出 DOM，免得留一个全屏层压在上面挡点击。 */
+      const preloader = document.getElementById('preloader');
+      if (preloader) {
+        let killed = false;
+        const kill = () => {
+          if (killed) return;
+          killed = true;
+          preloader.remove();
+        };
+        preloader.addEventListener('animationend', kill, { once: true });
+        /* 兜底：万一 animationend 没来（样式被覆盖、动画被禁等），3 秒后照样清掉 */
+        setTimeout(kill, 3000);
+      }
+
+      /* ================= 向下滚动提示 ================= */
+      document.querySelector('.scroll-cue')?.addEventListener('click', () => {
+        window.scrollBy({ top: window.innerHeight * 0.82, behavior: 'smooth' });
       });
 
       /* ================= 滚动入场（进入视口才播，依次错开） =================

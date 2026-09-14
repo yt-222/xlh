@@ -25,7 +25,14 @@ const titleHtml = SITE.title.includes('引力')
 <section class="hero">
   <div class="hero-inner">
     <div class="hero-copy">
-      {SITE.heroKicker && <span class="hero-kicker">{SITE.heroKicker}</span>}
+      {
+        SITE.heroKicker && (
+          /* shimmer 只包在内层，避免 background-clip:text 把 kicker 自己的边框/底色也裁掉 */
+          <span class="hero-kicker">
+            <span class="shimmer-text">{SITE.heroKicker}</span>
+          </span>
+        )
+      }
 
       <h1 class="hero-title" set:html={titleHtml} />
 
@@ -105,6 +112,28 @@ const titleHtml = SITE.title.includes('引力')
       </svg>
     </div>
   </div>
+
+  <!-- 向下滚动提示（参考 gongyeqi 的 scroll-down-effect）；点击可滚到下一屏 -->
+  <button class="scroll-cue" type="button" aria-label="向下滚动">
+    <span class="scroll-cue__mouse"><span class="scroll-cue__dot"></span></span>
+    <span class="scroll-cue__chevrons">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2.6"
+        stroke-linecap="round"
+        stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+    </span>
+    <span class="scroll-cue__label">向下滚动</span>
+  </button>
 </section>
 
 <script is:inline define:vars={{ taglines: [...SITE.taglines] }}>
