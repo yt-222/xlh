@@ -125,22 +125,82 @@ draft: false                 # true 时不会出现在线上
 > 仓库名如果是 `你的用户名.github.io`（用户主页仓库），地址就是根路径 `https://你的用户名.github.io/`。
 > 部署流程会自动识别这两种情况并设置正确的路径前缀，不用手动改配置。
 
-### 方式二：Cloudflare Pages（国内访问更稳）
+### 方式二：Cloudflare Pages（国内访问更稳）— **本项目已采用**
 
-GitHub Pages 在国内的访问速度不太稳定，如果主要给国内的朋友看，建议用 Cloudflare Pages：
+当前状态：**站点的构建产物同时部署在两个地方**，共用下面这一份源码，只是构建参数不同：
 
-1. 打开 [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **创建** → **Pages** → 连接 Git 仓库。
-2. 选择你的博客仓库，构建配置填：
-   - **构建命令**：`npm run build`
-   - **输出目录**：`dist`
-   - **环境变量**：不需要（根路径部署）
-3. 保存后自动构建，得到一个 `xxx.pages.dev` 的地址，国内大多能直接打开。
+| | GitHub Pages | Cloudflare Pages |
+| --- | --- | --- |
+| 地址 | `https://yt-222.github.io/xlh/` | `https://lzz-cabin.pages.dev` |
+| 路径前缀 | `/xlh`（子路径，自动处理） | `/`（根路径） |
+| 谁来构建 | 仓库里的 Actions | 本地一键脚本（手动触发） |
+| 国内访问 | 一般 | 明显更稳 |
 
-也可以用 Wrangler CLI 本地直接部署：
+#### 一键部署（推荐）
+
+双击工作区根目录的 **`deploy_cloudflare.bat`** 即可。它会先用 Astro 构建（自动传 `BASE_PATH=/` 和 `SITE_URL=https://lzz-cabin.pages.dev`），再用 wrangler 把 `dist/` 传上 Cloudflare Pages 项目 `lzz-cabin`。
+
+也可以在命令行里跑：
 
 ```bash
-npx wrangler pages deploy dist --project-name=你的项目名
+node deploy_lzz_cabin.mjs             # 构建 + 部署
+node deploy_lzz_cabin.mjs --no-build  # 跳过构建，直接部署现有 dist
+node deploy_lzz_cabin.mjs --dry-run   # 只列出会上传的文件，不联网
 ```
+
+凭证从根目录的 `cloudflare_key.txt` 读取（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`PROJECT_NAME`）。
+
+> ⚠️ 不要直接跑 `deploy_cloudflare.js` —— 它默认部署根目录的 `blog/`（旧版纯静态博客），会把线上站点覆盖回去。要走 `deploy_lzz_cabin.mjs`。
+
+#### 想改成"推送即部署"？
+
+在 [Cloudflare Dashboard](https://dash.cloudflare.com/) → **Workers & Pages** → **创建** → **Pages** → 连接 Git 仓库，选这个仓库，构建配置填：
+
+- **构建命令**：`npm run build`
+- **输出目录**：`dist`
+- **环境变量**：不需要（根路径部署）
+
+之后每次 `git push` 就会自动构建部署，不用再手动跑脚本。代价是需要在浏览器里完成一次 GitHub 授权（OAuth），这一步无法用脚本代办。
+
+## 参照朋友站补上的模块
+
+这一版是对着 [fanyouhao.top](https://fanyouhao.top/) 的结构做的，具体补了这些：
+
+### 导航栏改成分组下拉
+
+「首页」+「链接 ▾」+「空间 ▾」两段式，和朋友的站一致。改 `src/config.ts` 的 `NAV_GROUPS`
+即可增删；某个分组的 `items` 为空数组时，这一组不会渲染出来。带 `external: true` 的项新窗口打开。
+
+### 首页侧边栏的三个小工具
+
+| 组件 | 数据来自哪 | 说明 |
+| --- | --- | --- |
+| 天气卡 | `SITE.city` 或 `SITE.latitude/longitude` | 走 [Open-Meteo](https://open-meteo.com) 免费接口，**不需要 API key**，纯浏览器端请求 |
+| 写作轨迹 | 文章的真实发布日期 | 类似 GitHub 贡献图的日历热力图，发得越多格子越深，下面列最近三篇 |
+| 公告框 | `ANNOUNCEMENT` | 留空则整块不渲染 |
+
+> 城市名那个接口对写法有点挑（实测「武汉」查得到、「武汉市」查不到；「荆州」查不到、「荆州市」查得到），
+> 所以代码里会把几种写法依次试一遍。想 100% 稳就直接填 `SITE.latitude` / `SITE.longitude`。
+
+### 三个新页面
+
+| 页面 | 内容来源 | 怎么填 |
+| --- | --- | --- |
+| `/gallery/` 光影画廊 | 构建时自动扫描 `public/photos/` | 建一个子目录 = 一个相册，把图片丢进去就行；说明和日期可选填在 `ALBUMS` |
+| `/projects/` 项目 | `src/config.ts` 的 `PROJECTS` | 加一条对象；标 `featured: true` 的进上方大卡片 |
+| `/diary/` 碎片日记 | `src/data/diary.ts` 的 `DIARY` | 加 `{ date, text }`，`mood` 可选 |
+
+这三个页面现在**都是空状态**（显示填写引导）——刻意不塞假内容，等你自己放东西进去。
+
+想升级成动态的（打开页面就能发内容）可以照朋友那套做：Cloudflare Pages Functions + D1 数据库，
+`/diary/` 页面把 `import { DIARY }` 换成 `fetch('/api/diary')` 即可，数据结构一模一样。
+
+### 样式文件分工
+
+- `src/styles/global.css` —— 设计令牌（`:root` 与 `html.day-theme`）+ 基础组件
+- `src/styles/components.css` —— 这一批新增的模块（导航下拉、天气卡、热力图、画廊、项目、日记）
+
+两个文件都在 `Layout.astro` 里引入，构建后会合并成一个 CSS，不用手动管。
 
 ## 后续可以加的东西
 
