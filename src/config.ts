@@ -42,6 +42,8 @@ export const SITE = {
   url: 'https://lzz-cabin.pages.dev',
   /** 首页每页显示多少篇文章 */
   postsPerPage: 8,
+  /** 小站「开张」日期 —— 页脚运行时间从这天开始数（格式 YYYY-MM-DD） */
+  siteBirthday: '2026-08-23',
 
   /**
    * 天气卡显示的地点名 —— 只是个「牌子」，想怎么写就怎么写，不参与定位。
@@ -175,19 +177,31 @@ export interface ProjectItem {
 }
 
 /**
- * 项目列表 —— 现在是空的，页面会显示一句引导。
- * 想加项目，把下面的示例取消注释、照格式写就行：
- *
- *   {
- *     name: 'lzz的引力小屋',
- *     desc: '你正在浏览的这个网站，Astro + 纯 CSS，部署在 Cloudflare Pages。',
- *     tags: ['Astro', 'CSS', 'Cloudflare'],
- *     icon: '★',
- *     href: 'https://lzz-cabin.pages.dev',
- *     featured: true,
- *   },
+ * 项目列表 —— 已按真实在做的三件事填好（顺序即显示顺序）。
+ * featured: true 的那一个会显示在最上方的大卡片里。
  */
-export const PROJECTS: ProjectItem[] = [];
+export const PROJECTS: ProjectItem[] = [
+  {
+    name: 'lzz的引力小屋',
+    desc: '你正在看的这个网站：Astro 静态生成 + 手写设计令牌，落叶动效、音乐播放器、灯箱画廊一应俱全，部署在 Cloudflare Pages。',
+    tags: ['Astro', 'CSS', 'Cloudflare Pages'],
+    icon: '🪐',
+    href: 'https://lzz-cabin.pages.dev',
+    featured: true,
+  },
+  {
+    name: 'K230 RTSP 无线视频流',
+    desc: '基于嘉楠 K230（CanMV v1.4.3，YAHBOOM 开发板）的摄像头推流：H.264 硬件 VENC 编码走 RTSP 无线传输，配套自写的 Python/Tkinter/OpenCV 播放器，窗口大小可调。',
+    tags: ['K230', 'RTSP', 'H.264', 'Python', 'OpenCV'],
+    icon: '📡',
+  },
+  {
+    name: 'WorkBuddy 毛玻璃皮肤',
+    desc: '给 WorkBuddy 桌面端做的一整套界面定制：解包 app.asar 注入 CSS 皮肤，13 张精选壁纸库，一行命令完成替换与回滚的 apply_button.bat。',
+    tags: ['Electron', 'asar', 'CSS', '批处理'],
+    icon: '🎨',
+  },
+];
 
 /**
  * 光影画廊 —— 不需要在这里登记照片。
@@ -205,3 +219,64 @@ export const ALBUMS: Record<string, AlbumMeta> = {
   // 示例：目录叫 public/gallery/江夏的黄昏/，就写
   // '江夏的黄昏': { desc: '在纸坊江边拍的，那天的云很好看。', date: '2026-09-14' },
 };
+
+/**
+ * 画廊相册说明 —— 按相册 key（build-images.mjs 自动分组的目录名）配一句话。
+ * 这些话会显示在每个相册标题下面。没写的相册就什么都不显示。
+ * ⚠️ 下面是我按时间写的通用描述，你完全可以改成当天真正的故事。
+ */
+export const ALBUM_DESCS: Record<string, string> = {
+  '2026-08': '2026 年的夏末，随手按下的一些快门。',
+  '2023-07': '2023 年 7 月，被镜头留住的那几天。',
+  '2022-11': '2022 年深秋的几张。',
+  '2021-12': '2021 年冬天，这批里数量最多的一组。',
+  '2021-04': '2021 年春天的片段。',
+  '2020-08': '2020 年的夏天，时间最早的一批。',
+  misc: '散落的、没赶上归队的几张。',
+  unclassified: '没说清拍摄时间的几张，但值得留下。',
+};
+
+/** 画廊页头部引言 */
+export const GALLERY_LEAD =
+  '快门是最便宜的时间机器。这里按拍摄时间归组，存着这些年的天空、街道和一些舍不得删的瞬间。';
+
+/**
+ * 音乐播放器配置 —— 参考 momonyako 的 Meting 方案：
+ * 打开页面时什么都不加载，第一次点播放/展开才去拉歌单，不影响首屏速度。
+ *
+ * server: 音乐平台（netease 网易云 / tencent QQ 音乐）
+ * type:   playlist 歌单 / song 单曲 / album 专辑
+ * id:     歌单 id。默认是网易云「热歌榜」，换成你自己的歌单 id 即可
+ *         （网页版网易云打开歌单，地址栏 playlist?id= 后面那串数字）。
+ *
+ * 主接口挂了会自动换备用接口，三个都挂了就回落到 LOCAL_PLAYLIST。
+ */
+export const MUSIC = {
+  server: 'netease',
+  type: 'playlist',
+  id: '3778678',
+  apis: [
+    'https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r',
+    'https://api.injahow.cn/meting/?server=:server&type=:type&id=:id',
+    'https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id',
+  ],
+  /** 默认音量 0~1，会记住用户上次调的 */
+  volume: 0.7,
+  /** 歌单加载失败时的兜底曲目（本地直链，永远能播） */
+  localPlaylist: [
+    {
+      name: 'SoundHelix Song 1',
+      artist: 'SoundHelix',
+      url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+      cover: '',
+    },
+  ],
+} as const;
+
+/**
+ * 鼠标点击时蹦出来的小词（Butterfly 风格的点击彩蛋）。
+ * 随便改，建议 2~4 个字以内，太短太长都不好看。
+ */
+export const CLICK_WORDS = [
+  '引力', '✦', '阳光', '🌿', '热爱', '✨', 'biu', 'keep', '小屋', 'lucky', '向上', '∞',
+] as const;

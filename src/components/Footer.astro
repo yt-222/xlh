@@ -1,9 +1,96 @@
 ---
+/**
+ * 页脚 —— Butterfly 风格的多行信息区：
+ *   版权 / 技术支持 / 站点运行时间（每秒跳动）/ 不蒜子访问统计（加载失败就静默隐藏）
+ */
 import { SITE } from '@/config';
+import OrbitLogo from '@components/OrbitLogo.astro';
 const year = new Date().getFullYear();
 ---
 
 <footer class="site-footer">
-  <div>© {year} {SITE.author} · 用 Astro 构建 · 托管于 GitHub Pages</div>
-  <div>Powered by <a href="https://astro.build" target="_blank" rel="noopener">Astro</a></div>
+  <div class="footer-brand">
+    <OrbitLogo size={26} />
+    <span>{SITE.title}</span>
+  </div>
+
+  <div class="footer-line">
+    © {year} {SITE.author} · 除特别注明外，内容采用
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh" target="_blank" rel="noopener"
+      >CC BY-NC-SA 4.0</a
+    >
+  </div>
+
+  <div class="footer-line footer-tech">
+    Powered by <a href="https://astro.build" target="_blank" rel="noopener">Astro</a>
+    · 托管于 <a href="https://pages.cloudflare.com" target="_blank" rel="noopener">Cloudflare Pages</a>
+    · 图片 WebP / AVIF
+  </div>
+
+  <!-- 运行时间：从 siteBirthday 开始数，每秒刷新 -->
+  <div class="footer-line footer-runtime" id="footerRuntime" data-birthday={SITE.siteBirthday}>
+    小破站正在计算自己的年龄…
+  </div>
+
+  <!-- 不蒜子统计：第三方脚本加载失败时整块隐藏，不留半截话 -->
+  <div class="footer-line footer-stats" id="footerStats" hidden>
+    本站总访问量 <span id="busuanzi_value_site_pv">--</span> 次 · 访客数
+    <span id="busuanzi_value_site_uv">--</span> 人
+  </div>
 </footer>
+
+<script is:inline>
+  (function () {
+    /* 运行时间 */
+    var el = document.getElementById('footerRuntime');
+    if (el) {
+      var birth = new Date(el.dataset.birthday + 'T00:00:00+08:00').getTime();
+      var pad = function (n) {
+        return n < 10 ? '0' + n : '' + n;
+      };
+      var tickRuntime = function () {
+        var diff = Math.max(0, Date.now() - birth);
+        var d = Math.floor(diff / 86400000);
+        var h = Math.floor((diff % 86400000) / 3600000);
+        var m = Math.floor((diff % 3600000) / 60000);
+        var s = Math.floor((diff % 60000) / 1000);
+        el.textContent =
+          '这间小屋已在引力中运行 ' + d + ' 天 ' + pad(h) + ' 时 ' + pad(m) + ' 分 ' + pad(s) + ' 秒';
+      };
+      tickRuntime();
+      setInterval(tickRuntime, 1000);
+    }
+
+    /* 不蒜子：异步拉，两次机会，失败就保持隐藏 */
+    var stats = document.getElementById('footerStats');
+    if (stats) {
+      var tries = 0;
+      var loadBusuanzi = function () {
+        tries++;
+        var s = document.createElement('script');
+        s.src = '//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+        s.async = true;
+        s.onload = function () {
+          /* 脚本跑完后数字需要一点时间填充，轮询等到有值再亮出来 */
+          var wait = setInterval(function () {
+            var pv = document.getElementById('busuanzi_value_site_pv');
+            if (pv && pv.textContent && pv.textContent !== '--') {
+              clearInterval(wait);
+              stats.hidden = false;
+            }
+          }, 300);
+          setTimeout(function () {
+            clearInterval(wait);
+          }, 6000);
+        };
+        s.onerror = function () {
+          if (tries < 2) setTimeout(loadBusuanzi, 4000);
+        };
+        document.body.appendChild(s);
+      };
+      /* 空闲时再加载，不抢首屏 */
+      if ('requestIdleCallback' in window) requestIdleCallback(loadBusuanzi, { timeout: 4000 });
+      else setTimeout(loadBusuanzi, 2000);
+    }
+  })();
+</script>

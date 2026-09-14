@@ -25,6 +25,7 @@ import NavBar from '@components/NavBar.astro';
 import Footer from '@components/Footer.astro';
 import Lightbox from '@components/Lightbox.astro';
 import { withBase } from '@/utils/url';
+import { ALBUM_DESCS, GALLERY_LEAD } from '@/config';
 
 interface Photo {
   slug: string;
@@ -80,7 +81,7 @@ const years = [...new Set(albumsIndexed.map((a) => a.key.split('-')[0]))].sort((
 
         <div class="gallery-header">
           <h1 class="gallery-title">光影画廊</h1>
-          <p class="gallery-subtitle">把镜头里的时间，一张张收进这间小屋</p>
+          <p class="gallery-subtitle">{GALLERY_LEAD}</p>
           {
             totalPhotos > 0 && (
               <span class="gallery-count">
@@ -109,6 +110,8 @@ const years = [...new Set(albumsIndexed.map((a) => a.key.split('-')[0]))].sort((
                     {album.title}
                     <span class="album-section__count">{album.count} 张</span>
                   </h2>
+                  {/* 相册说明：在 config.ts 的 ALBUM_DESCS 里按相册 key 配置 */}
+                  {ALBUM_DESCS[album.key] && <p class="album-section__desc">{ALBUM_DESCS[album.key]}</p>}
 
                   {/* 瀑布流：保持每张照片的原始比例，不做统一裁切 */}
                   <div class="photo-masonry">
