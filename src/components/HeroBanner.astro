@@ -1,5 +1,13 @@
 ---
+/**
+ * Hero 区 —— 个人品牌主页的「门面」
+ *
+ * 版式是品牌首页的常见左文右图：左边是身份主张（kicker / 标题 / 宣言 / 行动按钮 / 数字），
+ * 右边是「引力」母题的具象化 —— 一个会自转的轨道系统，带引力波涟漪。
+ * 这套轨道符号在导航 logo、页脚也用同一套语言，构成统一识别。
+ */
 import { SITE } from '@/config';
+import { withBase } from '@/utils/url';
 
 interface Props {
   postCount: number;
@@ -7,16 +15,95 @@ interface Props {
 }
 
 const { postCount, tagCount } = Astro.props;
+
+/** 把品牌名里的「引力」挑出来上强调色；找不到就原样输出 */
+const titleHtml = SITE.title.includes('引力')
+  ? SITE.title.replace('引力', '<span class="hero-title-accent">引力</span>')
+  : SITE.title;
 ---
 
 <section class="hero">
-  <h1 class="hero-title">{SITE.title}</h1>
-  <p class="hero-subtitle" id="heroSubtitle">{SITE.taglines[0]}</p>
+  <div class="hero-inner">
+    <div class="hero-copy">
+      {SITE.heroKicker && <span class="hero-kicker">{SITE.heroKicker}</span>}
 
-  <div class="hero-stats">
-    <span class="hero-stat"><strong>{postCount}</strong>篇文章</span>
-    <span class="hero-stat"><strong>{tagCount}</strong>个标签</span>
-    <span class="hero-stat"><strong>∞</strong>杯咖啡</span>
+      <h1 class="hero-title" set:html={titleHtml} />
+
+      <p class="hero-lead">{SITE.brandLead}</p>
+
+      <p class="hero-subtitle" id="heroSubtitle">{SITE.taglines[0]}</p>
+
+      <div class="hero-actions">
+        <a href={withBase('/archive/')} class="btn btn--primary">
+          进入小屋
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+        </a>
+        <a href={withBase('/about/')} class="btn btn--ghost">关于我</a>
+      </div>
+
+      <div class="hero-stats">
+        <span class="hero-stat">
+          <strong data-count={postCount}>{postCount}</strong>篇文章
+        </span>
+        <span class="hero-stat">
+          <strong data-count={tagCount}>{tagCount}</strong>个标签
+        </span>
+        <span class="hero-stat"><strong>∞</strong>次胡思乱想</span>
+      </div>
+    </div>
+
+    <!-- 引力轨道系统 -->
+    <div class="hero-orbit" aria-hidden="true">
+      <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="ho-core" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="var(--sun)" stop-opacity="0.95" />
+            <stop offset="48%" stop-color="var(--sky)" stop-opacity="0.7" />
+            <stop offset="100%" stop-color="var(--blue)" stop-opacity="0" />
+          </radialGradient>
+          <radialGradient id="ho-halo" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="var(--sky)" stop-opacity="0.28" />
+            <stop offset="100%" stop-color="var(--sky)" stop-opacity="0" />
+          </radialGradient>
+        </defs>
+
+        <!-- 外层柔光 -->
+        <circle cx="150" cy="150" r="124" fill="url(#ho-halo)" />
+
+        <!-- 引力波涟漪：一圈圈扩散出去 -->
+        <g class="ho-waves">
+          <circle class="ho-wave" cx="150" cy="150" r="52" />
+          <circle class="ho-wave" cx="150" cy="150" r="52" style="animation-delay:1.8s" />
+          <circle class="ho-wave" cx="150" cy="150" r="52" style="animation-delay:3.6s" />
+        </g>
+
+        <!-- 三条轨道，各自反向/不同周期旋转，光点因此永不同步 -->
+        <g class="ho-ring ho-ring--1">
+          <ellipse cx="150" cy="150" rx="120" ry="46" />
+          <circle class="ho-sat ho-sat--sun" cx="270" cy="150" r="6" />
+        </g>
+
+        <g class="ho-ring ho-ring--2">
+          <ellipse cx="150" cy="150" rx="101" ry="73" />
+          <circle class="ho-sat ho-sat--sky" cx="251" cy="150" r="4.4" />
+        </g>
+
+        <g class="ho-ring ho-ring--3">
+          <circle cx="150" cy="150" r="87" />
+          <circle class="ho-sat ho-sat--coral" cx="237" cy="150" r="3.4" />
+        </g>
+
+        <!-- 核心 -->
+        <circle class="ho-core" cx="150" cy="150" r="42" fill="url(#ho-core)" />
+        <circle class="ho-core-dot" cx="150" cy="150" r="6.5" />
+      </svg>
+    </div>
   </div>
 </section>
 

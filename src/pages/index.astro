@@ -5,7 +5,7 @@ import HeroBanner from '@components/HeroBanner.astro';
 import PostCard from '@components/PostCard.astro';
 import Sidebar from '@components/Sidebar.astro';
 import Footer from '@components/Footer.astro';
-import { SITE } from '@/config';
+import { SITE, PILLARS } from '@/config';
 import { withBase } from '@/utils/url';
 import { getAllPosts, collectTags, collectCategories } from '@/utils/content';
 
@@ -13,6 +13,23 @@ const posts = await getAllPosts();
 const tags = collectTags(posts);
 const categories = collectCategories(posts);
 const recent = posts.slice(0, SITE.postsPerPage);
+
+/** PILLARS 的图标（stroke 风格，跟导航图标一套语言） */
+const PILLAR_ICONS: Record<string, string> = {
+  orbit:
+    'M3 12c0-2.4 4-4.4 9-4.4s9 2 9 4.4-4 4.4-9 4.4S3 14.4 3 12z|M12 13.6a1.6 1.6 0 1 0 0-3.2 1.6 1.6 0 0 0 0 3.2z',
+  spark: 'M12 2.6l2.3 6.3 6.3 1.1-4.8 4.2 1.3 6.2L12 17.2 6.9 20.4l1.3-6.2L3.4 10l6.3-1.1z',
+  signal: 'M3 12h3l2-6 3 12 2.5-8 2 4h5',
+};
+/** 生成完整的内联 SVG —— 裸 <path> 不会被渲染，必须包在 <svg> 里 */
+const iconSvg = (key: string) =>
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+  'stroke-linecap="round" stroke-linejoin="round">' +
+  (PILLAR_ICONS[key] || PILLAR_ICONS.spark)
+    .split('|')
+    .map((d) => `<path d="${d}" />`)
+    .join('') +
+  '</svg>';
 ---
 
 <Layout>
@@ -21,6 +38,20 @@ const recent = posts.slice(0, SITE.postsPerPage);
       <div class="web-wrapper">
         <NavBar />
         <HeroBanner postCount={posts.length} tagCount={tags.length} />
+
+        {
+          PILLARS.length > 0 && (
+            <div class="pillars">
+              {PILLARS.map((p) => (
+                <div class="pillar-card" data-animate data-spotlight>
+                  <span class="pillar-icon" set:html={iconSvg(p.icon)} />
+                  <h3 class="pillar-title">{p.title}</h3>
+                  <p class="pillar-desc">{p.desc}</p>
+                </div>
+              ))}
+            </div>
+          )
+        }
 
         <div class="layout-main">
           <main>
@@ -53,7 +84,7 @@ const recent = posts.slice(0, SITE.postsPerPage);
             }
           </main>
 
-          <Sidebar postCount={posts.length} categories={categories} tags={tags} />
+          <Sidebar postCount={posts.length} categories={categories} tags={tags} posts={posts} />
         </div>
 
         <Footer />

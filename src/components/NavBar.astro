@@ -1,17 +1,64 @@
 ---
-import { SITE, NAV_LINKS } from '@/config';
+/**
+ * 导航栏
+ * 结构参照朋友的站（fanyouhao.top）：左上角品牌字 + 「首页」+ 两组可展开的下拉（链接 / 空间）
+ * 交互：
+ *   - 桌面端：鼠标悬停展开，也支持点击（触屏 / 键盘）
+ *   - 移动端：汉堡按钮展开整块菜单，下拉变成可点开的折叠列表
+ */
+import { SITE, NAV_MAIN, NAV_GROUPS } from '@/config';
 import { withBase, stripBase } from '@/utils/url';
+import OrbitLogo from '@components/OrbitLogo.astro';
 
 const path = stripBase(Astro.url.pathname);
 const isActive = (href: string) =>
   href === '/' ? path === '/' : path.startsWith(href.replace(/\/$/, ''));
+
+/** 只渲染有内容的分组（items 为空就整组隐藏） */
+const groups = NAV_GROUPS.filter((g) => g.items.length > 0);
+
+/** 分组里有当前页时，把这个分组高亮 */
+const groupActive = (g: (typeof groups)[number]) =>
+  g.items.some((it) => !it.external && isActive(it.href));
+
+/** 图标库：每个键对应若干段 path 的 d 属性，用 | 分隔 */
+const ICONS: Record<string, string> = {
+  link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7L12 5|M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7L12 19',
+  grid: 'M3 3h7v7H3z|M14 3h7v7h-7z|M14 14h7v7h-7z|M3 14h7v7H3z',
+  image: 'M3 3h18v18H3z|M8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z|M21 15l-5-5L5 21',
+  pen: 'M12 20h9|M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+  box: 'M21 16V8l-9-5-9 5v8l9 5 9-5z|M3.3 7 12 12l8.7-5|M12 22V12',
+  archive: 'M3 4h18v4H3z|M5 8v12h14V8|M10 12h4',
+  tag: 'M20.6 13.4 12 22l-9-9V4h9z|M7.5 7.5h.01',
+  user: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2|M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  github:
+    'M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4|M9 18c-4.51 2-5-2-7-2',
+  bilibili: 'M4 8h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z|M8 4l2 4M16 4l-2 4|M9 13h.01M15 13h.01',
+  douyin:
+    'M9 18V5l12-2v13|M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0z|M21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z',
+  mail: 'M2 6h20v12H2z|M2 6l10 7 10-7',
+};
+
+/** 生成完整的内联 SVG —— 只拼 <path> 是不行的，浏览器不会渲染没有 <svg> 外壳的路径 */
+const iconSvg = (key: string) =>
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+  'stroke-linecap="round" stroke-linejoin="round">' +
+  (ICONS[key] || ICONS.link)
+    .split('|')
+    .map((d) => `<path d="${d}" />`)
+    .join('') +
+  '</svg>';
 ---
 
 <nav class="navbar">
   <div class="navbar-inner">
-    <a href={withBase('/')} class="nav-logo">{SITE.title}</a>
+    <a href={withBase('/')} class="nav-logo" aria-label={SITE.title}>
+      <OrbitLogo size={32} />
+      <span class="nav-logo-text">{SITE.logoText}</span>
+      {SITE.logoBadge && <span class="nav-logo-badge">{SITE.logoBadge}</span>}
+    </a>
 
-    <button class="nav-toggle" aria-label="菜单">
+    <button class="nav-toggle" aria-label="菜单" aria-expanded="false">
       <svg
         viewBox="0 0 24 24"
         width="20"
@@ -22,12 +69,48 @@ const isActive = (href: string) =>
         stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
     </button>
 
-    <div class="nav-links">
+    <div class="nav-links" id="nav-links">
+      <a
+        href={withBase(NAV_MAIN.href)}
+        class:list={['nav-link', { active: isActive(NAV_MAIN.href) }]}>{NAV_MAIN.text}</a
+      >
+
       {
-        NAV_LINKS.map((link) => (
-          <a href={withBase(link.href)} class:list={['nav-link', { active: isActive(link.href) }]}>
-            {link.text}
-          </a>
+        groups.map((g) => (
+          <div class="nav-dropdown">
+            <button
+              class:list={['nav-link', 'nav-dropdown-trigger', { active: groupActive(g) }]}
+              aria-expanded="false"
+              aria-haspopup="true"
+            >
+              {g.text}
+              <svg
+                class="nav-chevron"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2.4"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            <div class="dropdown-menu">
+              {g.items.map((it) => (
+                <a
+                  href={it.external ? it.href : withBase(it.href)}
+                  target={it.external ? '_blank' : undefined}
+                  rel={it.external ? 'noopener' : undefined}
+                  class:list={['dropdown-item', { active: !it.external && isActive(it.href) }]}
+                >
+                  <span class="dropdown-icon" set:html={iconSvg(it.icon)} />
+                  <span class="dropdown-text">{it.text}</span>
+                </a>
+              ))}
+            </div>
+          </div>
         ))
       }
     </div>
@@ -54,3 +137,38 @@ const isActive = (href: string) =>
     </button>
   </div>
 </nav>
+
+<script>
+  // 移动端汉堡菜单 + 下拉点击展开（桌面端悬停已经由 CSS 处理）
+  const navbar = document.querySelector('.navbar');
+  const toggle = navbar?.querySelector('.nav-toggle');
+  const links = navbar?.querySelector('.nav-links');
+
+  toggle?.addEventListener('click', () => {
+    const open = links?.classList.toggle('open');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+
+  navbar?.querySelectorAll('.nav-dropdown-trigger').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const dropdown = btn.closest('.nav-dropdown');
+      const wasOpen = dropdown?.classList.contains('open');
+      navbar.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
+      navbar.querySelectorAll('.nav-dropdown-trigger').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+      if (!wasOpen && dropdown) {
+        dropdown.classList.add('open');
+        btn.setAttribute('aria-expanded', 'true');
+      }
+    });
+  });
+
+  // 点其他地方 / 按 Esc 收起
+  document.addEventListener('click', () => {
+    navbar?.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape')
+      navbar?.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
+  });
+</script>

@@ -1,0 +1,31 @@
+---
+/**
+ * 引力轨道标志 —— 站点的视觉母题
+ *
+ * 「引力小屋」这个名字的具象化：中心一个发光核心，外层两条轨道绕着它转，
+ * 轨道上各挂一颗光点。导航左上角、Hero、页脚都用它，形成统一的识别符号。
+ *
+ * 两条轨道反向旋转、周期不同（22s / 16s），所以两颗光点永远不会同步，
+ * 看上去像真实的行星系统。
+ */
+interface Props {
+  /** 边长（px） */
+  size?: number;
+}
+
+const { size = 34 } = Astro.props;
+---
+
+<span class="orbit-logo" style={`--ol-size:${size}px`} aria-hidden="true">
+  <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <g class="ol-ring ol-ring--a">
+      <ellipse cx="24" cy="24" rx="20" ry="7.6" />
+      <circle class="ol-sat ol-sat--sun" cx="44" cy="24" r="2.6" />
+    </g>
+    <g class="ol-ring ol-ring--b">
+      <ellipse cx="24" cy="24" rx="16.5" ry="12" />
+      <circle class="ol-sat ol-sat--sky" cx="40.5" cy="24" r="1.9" />
+    </g>
+    <circle class="ol-core" cx="24" cy="24" r="5.2" />
+  </svg>
+</span>

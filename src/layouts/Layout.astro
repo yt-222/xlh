@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
-import SakuraEffect from '@components/SakuraEffect.astro';
+import '../styles/components.css';
+import LeafFall from '@components/LeafFall.astro';
 import { SITE } from '@/config';
 import { withBase } from '@/utils/url';
 
@@ -24,6 +25,10 @@ const pageDesc = description || SITE.description;
     <meta name="generator" content={Astro.generator} />
     <link rel="icon" type="image/svg+xml" href={withBase('/favicon.svg')} />
 
+    <!-- 主题色（移动端浏览器地址栏也跟着变） -->
+    <meta name="theme-color" content="#f7fafd" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#061223" media="(prefers-color-scheme: dark)" />
+
     <!-- 字体：像素标题字 + 中文正文 + 代码等宽 -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -32,19 +37,34 @@ const pageDesc = description || SITE.description;
       rel="stylesheet"
     />
 
-    <!-- 主题预加载：在首次绘制前就把 day-theme 挂上，避免刷新时闪一下 -->
+    <!-- 首屏前置脚本：必须在绘制前跑完，避免刷新时闪一下主题色 -->
     <script is:inline>
       (function () {
+        var d = document.documentElement;
+        /* 标记「有 JS」：滚动入场动画的初始隐藏只在有 JS 时生效，
+           这样脚本被禁用时内容依然完整可见，不会白屏 */
+        d.classList.add('has-js');
         try {
-          var saved = localStorage.getItem('xlh-theme');
-          var isDay = saved === 'day';
-          if (isDay) document.documentElement.classList.add('day-theme');
+          /* 默认日间主题（白 + 蓝是本站主调）；
+             只有用户明确切到夜间时才会是 'night' */
+          var saved = localStorage.getItem('gravity-theme');
+          if (saved !== 'night') d.classList.add('day-theme');
         } catch (e) {}
       })();
     </script>
   </head>
   <body>
-    <SakuraEffect />
+    <!-- 背景光斑：缓慢漂移的柔和色团，给纯色底加一层空气感 -->
+    <div class="glow-field" aria-hidden="true">
+      <span class="glow-blob glow-blob--a"></span>
+      <span class="glow-blob glow-blob--b"></span>
+      <span class="glow-blob glow-blob--c"></span>
+    </div>
+
+    <!-- 跟随光标的光晕（只在鼠标设备上出现） -->
+    <span class="cursor-glow" id="cursorGlow" aria-hidden="true"></span>
+
+    <LeafFall />
     <div class="reading-progress" id="readingProgress" aria-hidden="true"></div>
     <slot />
 
@@ -59,8 +79,8 @@ const pageDesc = description || SITE.description;
     </button>
 
     <script>
-      /* ---------- 主题切换 ---------- */
-      const THEME_KEY = 'xlh-theme';
+      /* ================= 主题切换 ================= */
+      const THEME_KEY = 'gravity-theme';
 
       function applyTheme(isDay: boolean) {
         document.documentElement.classList.toggle('day-theme', isDay);
@@ -76,7 +96,7 @@ const pageDesc = description || SITE.description;
         }
       });
 
-      /* ---------- 移动端菜单 ---------- */
+      /* ================= 移动端菜单 ================= */
       document.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
         const toggle = target.closest('.nav-toggle');
@@ -88,7 +108,7 @@ const pageDesc = description || SITE.description;
         }
       });
 
-      /* ---------- 阅读进度 + 返回顶部 ---------- */
+      /* ================= 阅读进度 + 返回顶部 ================= */
       const progress = document.getElementById('readingProgress');
       const backTop = document.getElementById('backToTop');
 
@@ -107,12 +127,102 @@ const pageDesc = description || SITE.description;
         window.scrollTo({ top: 0, behavior: 'smooth' });
       });
 
-      /* ---------- 卡片入场动画（依次淡入） ---------- */
-      const cards = document.querySelectorAll<HTMLElement>('[data-animate]');
-      cards.forEach((card, i) => {
-        card.style.animationDelay = Math.min(i, 10) * 60 + 'ms';
-        card.classList.add('animate-in');
+      /* ================= 滚动入场（进入视口才播，依次错开） =================
+         比原来「页面一加载就全部播完」更耐看：往下滚时内容才一片片浮上来 */
+      const revealItems = document.querySelectorAll<HTMLElement>('[data-animate]');
+
+      /* 动画播完就摘掉动画控制（换成 .reveal-done），
+         否则 animation-fill-mode 会一直压着 transform，卡片的 hover 位移会失效 */
+      const finishReveal = (el: HTMLElement) => {
+        el.classList.add('reveal-done');
+        el.classList.remove('in-view');
+      };
+
+      if (revealItems.length) {
+        revealItems.forEach((el, i) => {
+          el.style.setProperty('--reveal-delay', (i % 8) * 70 + 'ms');
+          el.addEventListener('animationend', () => finishReveal(el), { once: true });
+        });
+
+        if ('IntersectionObserver' in window) {
+          const io = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('in-view');
+                io.unobserve(entry.target);
+              });
+            },
+            { rootMargin: '0px 0px -6% 0px', threshold: 0.05 }
+          );
+          revealItems.forEach((el) => io.observe(el));
+        } else {
+          revealItems.forEach((el) => finishReveal(el));
+        }
+      }
+
+      /* ================= 数字滚动 ================= */
+      const counters = document.querySelectorAll<HTMLElement>('[data-count]');
+      counters.forEach((el) => {
+        const target = Number(el.dataset.count);
+        if (!Number.isFinite(target)) return;
+        const suffix = el.dataset.countSuffix || '';
+        const duration = 900;
+        let startTs = 0;
+        const step = (ts: number) => {
+          if (!startTs) startTs = ts;
+          const p = Math.min(1, (ts - startTs) / duration);
+          /* easeOutCubic：数字先快后慢，收尾干净 */
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(target * eased) + suffix;
+          if (p < 1) requestAnimationFrame(step);
+        };
+        el.textContent = '0' + suffix;
+        requestAnimationFrame(step);
       });
+
+      /* ================= 聚光卡片：把鼠标位置写进 --mx / --my =================
+         CSS 用这两个变量画一个跟随鼠标的柔光，是 Aceternity / React Bits 那类
+         「spotlight card」的纯 CSS 做法 */
+      const spotCards = document.querySelectorAll<HTMLElement>('[data-spotlight]');
+      spotCards.forEach((card) => {
+        card.addEventListener(
+          'pointermove',
+          (e) => {
+            const rect = card.getBoundingClientRect();
+            card.style.setProperty('--mx', ((e.clientX - rect.left) / rect.width) * 100 + '%');
+            card.style.setProperty('--my', ((e.clientY - rect.top) / rect.height) * 100 + '%');
+          },
+          { passive: true }
+        );
+      });
+
+      /* ================= 跟随光标的光晕 ================= */
+      const cursorGlow = document.getElementById('cursorGlow');
+      if (cursorGlow && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+        let targetX = window.innerWidth / 2;
+        let targetY = window.innerHeight * 0.3;
+        let curX = targetX;
+        let curY = targetY;
+
+        window.addEventListener(
+          'pointermove',
+          (e) => {
+            targetX = e.clientX;
+            targetY = e.clientY;
+          },
+          { passive: true }
+        );
+
+        /* 缓动跟随（而不是硬贴在光标上），更有滑顺的质感 */
+        const follow = () => {
+          curX += (targetX - curX) * 0.075;
+          curY += (targetY - curY) * 0.075;
+          cursorGlow.style.transform = `translate3d(${curX}px, ${curY}px, 0)`;
+          requestAnimationFrame(follow);
+        };
+        follow();
+      }
     </script>
   </body>
 </html>
