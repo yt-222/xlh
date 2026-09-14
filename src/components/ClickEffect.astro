@@ -1,0 +1,51 @@
+---
+/**
+ * 鼠标点击彩蛋（Butterfly 经典玩法）：点一下，一个小词从指尖浮上去再消散。
+ * - 纯 DOM + CSS 动画，不用 canvas，一次最多留 12 个，性能无感
+ * - 输入框里打字、右键、框选文字时不触发
+ * - 尊重「减少动态效果」系统设置
+ */
+import { CLICK_WORDS } from '@/config';
+
+/** 配色取设计令牌里的点缀色系（这里写具体值，因为这些词是「飘在内容之上」的，需要各自分明） */
+const COLORS = ['#3b82f6', '#0ea5e9', '#f59e0b', '#f97362', '#10b981', '#fb7185'];
+---
+
+<script is:inline define:vars={{ words: [...CLICK_WORDS], colors: COLORS }}>
+  (function () {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    var live = 0;
+    var MAX = 12;
+
+    document.addEventListener('pointerdown', function (e) {
+      /* 左键、非文本输入场景才放烟花 */
+      if (e.button !== 0 || live >= MAX) return;
+      var t = e.target;
+      if (t && t.closest && t.closest('input, textarea, [contenteditable="true"]')) return;
+      if (String(window.getSelection && window.getSelection())) return;
+
+      live++;
+      var el = document.createElement('span');
+      el.className = 'click-burst';
+      el.textContent = words[Math.floor(Math.random() * words.length)];
+      el.style.left = e.clientX + 'px';
+      el.style.top = e.clientY + 'px';
+      el.style.color = colors[Math.floor(Math.random() * colors.length)];
+      el.style.setProperty('--burst-x', (Math.random() * 60 - 30).toFixed(0) + 'px');
+      el.style.setProperty('--burst-r', (Math.random() * 30 - 15).toFixed(0) + 'deg');
+      document.body.appendChild(el);
+      el.addEventListener('animationend', function () {
+        el.remove();
+        live--;
+      });
+      /* 兜底，防止 animationend 丢失导致计数泄漏 */
+      setTimeout(function () {
+        if (el.parentNode) {
+          el.remove();
+          live--;
+        }
+      }, 1400);
+    });
+  })();
+</script>

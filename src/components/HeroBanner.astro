@@ -1,10 +1,11 @@
 ---
 /**
- * Hero 区 —— 个人品牌主页的「门面」
+ * Hero —— Butterfly 风格的全屏横幅
  *
- * 版式是品牌首页的常见左文右图：左边是身份主张（kicker / 标题 / 宣言 / 行动按钮 / 数字），
- * 右边是「引力」母题的具象化 —— 一个会自转的轨道系统，带引力波涟漪。
- * 这套轨道符号在导航 logo、页脚也用同一套语言，构成统一识别。
+ * 布局：整屏横幅（满宽、约一屏高），内容居中堆叠：
+ *   kicker → 大标题 → 打字机副标题 → 品牌宣言 → 按钮 → 数字
+ * 背景：柔光渐变 + 一个放得很淡的引力轨道（母题退到背景层，不抢字）
+ * 底部：两层波浪缓缓漂移（Butterfly 的标志性收尾），颜色吃掉页面底色完成过渡
  */
 import { SITE } from '@/config';
 import { withBase } from '@/utils/url';
@@ -22,98 +23,91 @@ const titleHtml = SITE.title.includes('引力')
   : SITE.title;
 ---
 
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-copy">
-      {
-        SITE.heroKicker && (
-          /* shimmer 只包在内层，避免 background-clip:text 把 kicker 自己的边框/底色也裁掉 */
-          <span class="hero-kicker">
-            <span class="shimmer-text">{SITE.heroKicker}</span>
-          </span>
-        )
-      }
+<section class="hero hero--banner">
+  <!-- 背景层：渐变 + 淡化的轨道母题 -->
+  <div class="hero-bg" aria-hidden="true">
+    <svg class="hero-bg__orbit" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="hb-core" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="var(--sun)" stop-opacity="0.9" />
+          <stop offset="50%" stop-color="var(--sky)" stop-opacity="0.55" />
+          <stop offset="100%" stop-color="var(--blue)" stop-opacity="0" />
+        </radialGradient>
+      </defs>
+      <g class="ho-ring ho-ring--1">
+        <ellipse cx="150" cy="150" rx="120" ry="46"></ellipse>
+        <circle class="ho-sat ho-sat--sun" cx="270" cy="150" r="6"></circle>
+      </g>
+      <g class="ho-ring ho-ring--2">
+        <ellipse cx="150" cy="150" rx="101" ry="73"></ellipse>
+        <circle class="ho-sat ho-sat--sky" cx="251" cy="150" r="4.4"></circle>
+      </g>
+      <g class="ho-ring ho-ring--3">
+        <circle cx="150" cy="150" r="87"></circle>
+        <circle class="ho-sat ho-sat--coral" cx="237" cy="150" r="3.4"></circle>
+      </g>
+      <circle cx="150" cy="150" r="42" fill="url(#hb-core)"></circle>
+    </svg>
+  </div>
 
-      <h1 class="hero-title" set:html={titleHtml} />
-
-      <p class="hero-lead">{SITE.brandLead}</p>
-
-      <p class="hero-subtitle" id="heroSubtitle">{SITE.taglines[0]}</p>
-
-      <div class="hero-actions">
-        <a href={withBase('/archive/')} class="btn btn--primary">
-          进入小屋
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
-        </a>
-        <a href={withBase('/about/')} class="btn btn--ghost">关于我</a>
-      </div>
-
-      <div class="hero-stats">
-        <span class="hero-stat">
-          <strong data-count={postCount}>{postCount}</strong>篇文章
+  <div class="hero-banner-inner">
+    {
+      SITE.heroKicker && (
+        <span class="hero-kicker">
+          <span class="shimmer-text">{SITE.heroKicker}</span>
         </span>
-        <span class="hero-stat">
-          <strong data-count={tagCount}>{tagCount}</strong>个标签
-        </span>
-        <span class="hero-stat"><strong>∞</strong>次胡思乱想</span>
-      </div>
+      )
+    }
+
+    <h1 class="hero-title" set:html={titleHtml} />
+
+    <!-- 打字机副标题：一句一句敲出来，光标常驻 -->
+    <p class="hero-typed">
+      <span id="typedText"></span><span class="typed-caret" aria-hidden="true"></span>
+    </p>
+
+    <p class="hero-lead">{SITE.brandLead}</p>
+
+    <div class="hero-actions">
+      <a href={withBase('/archive/')} class="btn btn--primary">
+        进入小屋
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+      </a>
+      <a href={withBase('/about/')} class="btn btn--ghost">关于我</a>
     </div>
 
-    <!-- 引力轨道系统 -->
-    <div class="hero-orbit" aria-hidden="true">
-      <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <radialGradient id="ho-core" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="var(--sun)" stop-opacity="0.95" />
-            <stop offset="48%" stop-color="var(--sky)" stop-opacity="0.7" />
-            <stop offset="100%" stop-color="var(--blue)" stop-opacity="0" />
-          </radialGradient>
-          <radialGradient id="ho-halo" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="var(--sky)" stop-opacity="0.28" />
-            <stop offset="100%" stop-color="var(--sky)" stop-opacity="0" />
-          </radialGradient>
-        </defs>
-
-        <!-- 外层柔光 -->
-        <circle cx="150" cy="150" r="124" fill="url(#ho-halo)" />
-
-        <!-- 引力波涟漪：一圈圈扩散出去 -->
-        <g class="ho-waves">
-          <circle class="ho-wave" cx="150" cy="150" r="52" />
-          <circle class="ho-wave" cx="150" cy="150" r="52" style="animation-delay:1.8s" />
-          <circle class="ho-wave" cx="150" cy="150" r="52" style="animation-delay:3.6s" />
-        </g>
-
-        <!-- 三条轨道，各自反向/不同周期旋转，光点因此永不同步 -->
-        <g class="ho-ring ho-ring--1">
-          <ellipse cx="150" cy="150" rx="120" ry="46" />
-          <circle class="ho-sat ho-sat--sun" cx="270" cy="150" r="6" />
-        </g>
-
-        <g class="ho-ring ho-ring--2">
-          <ellipse cx="150" cy="150" rx="101" ry="73" />
-          <circle class="ho-sat ho-sat--sky" cx="251" cy="150" r="4.4" />
-        </g>
-
-        <g class="ho-ring ho-ring--3">
-          <circle cx="150" cy="150" r="87" />
-          <circle class="ho-sat ho-sat--coral" cx="237" cy="150" r="3.4" />
-        </g>
-
-        <!-- 核心 -->
-        <circle class="ho-core" cx="150" cy="150" r="42" fill="url(#ho-core)" />
-        <circle class="ho-core-dot" cx="150" cy="150" r="6.5" />
-      </svg>
+    <div class="hero-stats">
+      <span class="hero-stat">
+        <strong data-count={postCount}>{postCount}</strong>篇文章
+      </span>
+      <span class="hero-stat">
+        <strong data-count={tagCount}>{tagCount}</strong>个标签
+      </span>
+      <span class="hero-stat"><strong>∞</strong>次胡思乱想</span>
     </div>
   </div>
 
-  <!-- 向下滚动提示（参考 gongyeqi 的 scroll-down-effect）；点击可滚到下一屏 -->
+  <!-- 底部波浪：两层错速漂移，颜色取页面底色，完成横幅 → 内容的过渡 -->
+  <div class="hero-waves" aria-hidden="true">
+    <svg class="hero-wave hero-wave--1" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path
+        d="M0,60 C200,110 400,10 600,60 C800,110 1000,10 1200,60 L1200,120 L0,120 Z"
+      ></path>
+    </svg>
+    <svg class="hero-wave hero-wave--2" viewBox="0 0 1200 120" preserveAspectRatio="none">
+      <path
+        d="M0,70 C240,20 480,115 720,65 C960,20 1080,100 1200,70 L1200,120 L0,120 Z"
+      ></path>
+    </svg>
+  </div>
+
+  <!-- 向下滚动提示；点击可滚到下一屏 -->
   <button class="scroll-cue" type="button" aria-label="向下滚动">
     <span class="scroll-cue__mouse"><span class="scroll-cue__dot"></span></span>
     <span class="scroll-cue__chevrons">
@@ -137,17 +131,43 @@ const titleHtml = SITE.title.includes('引力')
 </section>
 
 <script is:inline define:vars={{ taglines: [...SITE.taglines] }}>
+  /* 打字机：敲字 → 停顿 → 回删 → 下一句，循环。
+     系统开了「减少动态」就只静态显示第一句。 */
   (function () {
-    var el = document.getElementById('heroSubtitle');
+    var el = document.getElementById('typedText');
     if (!el || !taglines.length) return;
-    var idx = 0;
-    setInterval(function () {
-      el.style.opacity = '0';
-      setTimeout(function () {
-        idx = (idx + 1) % taglines.length;
-        el.textContent = taglines[idx];
-        el.style.opacity = '1';
-      }, 300);
-    }, 3600);
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      el.textContent = taglines[0];
+      var caret0 = document.querySelector('.typed-caret');
+      if (caret0) caret0.style.display = 'none';
+      return;
+    }
+
+    var line = 0;
+    var pos = 0;
+    var deleting = false;
+
+    function tick() {
+      var text = taglines[line];
+      if (!deleting) {
+        pos++;
+        el.textContent = text.slice(0, pos);
+        if (pos >= text.length) {
+          deleting = true;
+          return setTimeout(tick, 2200); /* 完整显示一会 */
+        }
+        return setTimeout(tick, 90 + Math.random() * 70); /* 人手敲字的节奏感 */
+      }
+      pos--;
+      el.textContent = text.slice(0, pos);
+      if (pos <= 0) {
+        deleting = false;
+        line = (line + 1) % taglines.length;
+        return setTimeout(tick, 450);
+      }
+      setTimeout(tick, 32);
+    }
+    tick();
   })();
 </script>

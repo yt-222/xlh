@@ -1,0 +1,129 @@
+---
+/**
+ * 文章目录（浮动 TOC，参考 momonyako 的 FloatingTOC）
+ *
+ * - 从文章正文的 h2/h3 自动生成，右下角悬浮按钮点开
+ * - 滚动到哪一节，目录里对应项自动高亮（IntersectionObserver）
+ * - 点目录项平滑滚动过去；标题没有 id 会自动补上
+ * - 文章不足 3 个标题时整个按钮不出现
+ */
+---
+
+<div class="toc-fab-wrap" id="tocFabWrap" hidden>
+  <button class="toc-fab" id="tocFab" aria-label="文章目录" aria-expanded="false" title="文章目录">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path d="M8 6h13M8 12h13M8 18h13"></path>
+      <path d="M3 6h.01M3 12h.01M3 18h.01"></path>
+    </svg>
+  </button>
+  <nav class="toc-panel" id="tocPanel" hidden aria-label="文章目录">
+    <div class="toc-panel__title">目录</div>
+    <div class="toc-panel__list" id="tocList"></div>
+  </nav>
+</div>
+
+<script is:inline>
+  (function () {
+    var wrap = document.getElementById('tocFabWrap');
+    var fab = document.getElementById('tocFab');
+    var panel = document.getElementById('tocPanel');
+    var list = document.getElementById('tocList');
+    var article = document.querySelector('.markdown-body');
+    if (!wrap || !article) return;
+
+    var heads = article.querySelectorAll('h2, h3');
+    if (heads.length < 3) return;
+
+    /* 补 id（Astro 默认会加，这里兜底） */
+    heads.forEach(function (h, i) {
+      if (!h.id) h.id = 'toc-h-' + i;
+    });
+
+    list.innerHTML = Array.prototype.map
+      .call(heads, function (h, i) {
+        var lv = h.tagName === 'H3' ? ' toc-item--sub' : '';
+        return (
+          '<a class="toc-item' +
+          lv +
+          '" href="#' +
+          h.id +
+          '" data-target="' +
+          h.id +
+          '">' +
+          h.textContent +
+          '</a>'
+        );
+      })
+      .join('');
+
+    wrap.hidden = false;
+
+    fab.addEventListener('click', function () {
+      var open = panel.hidden;
+      panel.hidden = !open;
+      fab.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    /* 点击目录项：平滑滚动 + 收起面板（移动端尤其需要收起） */
+    list.addEventListener('click', function (e) {
+      var a = e.target.closest('.toc-item');
+      if (!a) return;
+      e.preventDefault();
+      var target = document.getElementById(a.dataset.target);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.replaceState(null, '', '#' + a.dataset.target);
+      if (window.innerWidth < 900) {
+        panel.hidden = true;
+        fab.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    /* 滚动高亮：以视口上 1/4 为判定线 */
+    if ('IntersectionObserver' in window) {
+      var links = {};
+      list.querySelectorAll('.toc-item').forEach(function (a) {
+        links[a.dataset.target] = a;
+      });
+      var visible = new Set();
+      var io = new IntersectionObserver(
+        function (entries) {
+          entries.forEach(function (en) {
+            if (en.isIntersecting) visible.add(en.target.id);
+            else visible.delete(en.target.id);
+          });
+          /* 取可见标题里最靠上的一个高亮；都不可见就保持现状 */
+          var first = heads.length ? null : null;
+          for (var i = 0; i < heads.length; i++) {
+            if (visible.has(heads[i].id)) {
+              first = heads[i].id;
+              break;
+            }
+          }
+          if (!first) return;
+          list.querySelectorAll('.toc-item').forEach(function (a) {
+            a.classList.toggle('is-active', a.dataset.target === first);
+          });
+        },
+        { rootMargin: '-10% 0px -65% 0px', threshold: 0 }
+      );
+      heads.forEach(function (h) {
+        io.observe(h);
+      });
+    }
+
+    /* 点面板外收起 */
+    document.addEventListener('click', function (e) {
+      if (!panel.hidden && !e.target.closest('#tocFabWrap')) {
+        panel.hidden = true;
+        fab.setAttribute('aria-expanded', 'false');
+      }
+    });
+  })();
+</script>

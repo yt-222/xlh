@@ -1,0 +1,503 @@
+---
+/**
+ * 音乐播放器（参考 momonyako 的 Meting 方案 + Butterfly APlayer 的左下悬浮形态）
+ *
+ * 设计要点：
+ * - 左下角一个旋转封面球，点开是完整面板（封面/歌名/歌手/歌词/进度/控制/歌单）
+ * - 歌单走 Meting API（主接口 + 两个备用），全部失败回落到本地兜底曲目
+ * - 懒加载：第一次点播放或展开面板才去拉歌单，首屏零开销
+ * - 纯原生 <audio>，不引第三方库（APlayer + MetingJS 要 100KB+，不值）
+ * - 音量 / 播放模式 / 上次播的歌 记在 localStorage
+ */
+import { MUSIC } from '@/config';
+---
+
+<div class="music-player" id="musicPlayer">
+  <button class="mp-fab" id="mpFab" aria-label="打开音乐播放器" title="音乐播放器">
+    <span class="mp-fab__disc" id="mpFabDisc">
+      <img class="mp-fab__cover" id="mpFabCover" alt="" hidden />
+      <svg
+        class="mp-fab__note"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 18V5l12-2v13"></path>
+        <circle cx="6" cy="18" r="3"></circle>
+        <circle cx="18" cy="16" r="3"></circle>
+      </svg>
+    </span>
+  </button>
+
+  <div class="mp-panel" id="mpPanel" hidden role="region" aria-label="音乐播放器">
+    <div class="mp-head">
+      <span class="mp-cover-wrap">
+        <img class="mp-cover" id="mpCover" alt="" hidden />
+        <svg
+          class="mp-cover__ph"
+          id="mpCoverPh"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M9 18V5l12-2v13"></path>
+          <circle cx="6" cy="18" r="3"></circle>
+          <circle cx="18" cy="16" r="3"></circle>
+        </svg>
+      </span>
+      <div class="mp-info">
+        <div class="mp-title" id="mpTitle">引力电台</div>
+        <div class="mp-artist" id="mpArtist">点一下播放，歌单马上来</div>
+      </div>
+      <button class="mp-close" id="mpClose" aria-label="收起播放器">×</button>
+    </div>
+
+    <div class="mp-lyric" id="mpLyric" aria-live="off">♪</div>
+
+    <div class="mp-progress" id="mpProgress" role="slider" aria-label="播放进度" tabindex="0">
+      <div class="mp-progress__track">
+        <div class="mp-progress__bar" id="mpBar"></div>
+      </div>
+    </div>
+    <div class="mp-time">
+      <span id="mpCur">0:00</span>
+      <span id="mpDur">0:00</span>
+    </div>
+
+    <div class="mp-controls">
+      <button class="mp-btn" id="mpMode" aria-label="播放模式" title="列表循环">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-list">
+          <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+          <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-one" style="display:none">
+          <path d="M17 2l4 4-4 4"></path><path d="M3 11v-1a4 4 0 0 1 4-4h14"></path>
+          <path d="M7 22l-4-4 4-4"></path><path d="M21 13v1a4 4 0 0 1-4 4H3"></path>
+          <text x="12" y="15.5" font-size="9" fill="currentColor" stroke="none" text-anchor="middle">1</text>
+        </svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ico-random" style="display:none">
+          <path d="M16 3h5v5"></path><path d="M4 20 21 3"></path>
+          <path d="M21 16v5h-5"></path><path d="m15 15 6 6"></path><path d="M4 4l5 5"></path>
+        </svg>
+      </button>
+      <button class="mp-btn" id="mpPrev" aria-label="上一首">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+          <path d="M19 20 9 12l10-8z"></path><path d="M5 19V5" fill="none" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+      </button>
+      <button class="mp-btn mp-btn--play" id="mpPlay" aria-label="播放">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="ico-play">
+          <path d="M8 5.5v13l11-6.5z"></path>
+        </svg>
+        <svg viewBox="0 0 24 24" fill="currentColor" class="ico-pause" style="display:none">
+          <rect x="6" y="5" width="4" height="14" rx="1"></rect>
+          <rect x="14" y="5" width="4" height="14" rx="1"></rect>
+        </svg>
+      </button>
+      <button class="mp-btn" id="mpNext" aria-label="下一首">
+        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+          <path d="m5 4 10 8-10 8z"></path><path d="M19 5v14" fill="none" stroke-width="2" stroke-linecap="round"></path>
+        </svg>
+      </button>
+      <button class="mp-btn" id="mpListBtn" aria-label="歌单列表">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 6h13M8 12h13M8 18h13"></path>
+          <circle cx="4" cy="6" r="1" fill="currentColor"></circle>
+          <circle cx="4" cy="12" r="1" fill="currentColor"></circle>
+          <circle cx="4" cy="18" r="1" fill="currentColor"></circle>
+        </svg>
+      </button>
+    </div>
+
+    <div class="mp-volume">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M11 5 6 9H2v6h4l5 4z"></path><path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+      </svg>
+      <input type="range" id="mpVol" min="0" max="100" value="70" aria-label="音量" />
+    </div>
+
+    <div class="mp-playlist" id="mpPlaylist" hidden></div>
+  </div>
+
+  <audio id="mpAudio" preload="none"></audio>
+</div>
+
+<script is:inline define:vars={{ musicConfig: MUSIC }}>
+  (function () {
+    var audio = document.getElementById('mpAudio');
+    var fab = document.getElementById('mpFab');
+    var disc = document.getElementById('mpFabDisc');
+    var fabCover = document.getElementById('mpFabCover');
+    var panel = document.getElementById('mpPanel');
+    var cover = document.getElementById('mpCover');
+    var coverPh = document.getElementById('mpCoverPh');
+    var titleEl = document.getElementById('mpTitle');
+    var artistEl = document.getElementById('mpArtist');
+    var lyricEl = document.getElementById('mpLyric');
+    var progress = document.getElementById('mpProgress');
+    var bar = document.getElementById('mpBar');
+    var curEl = document.getElementById('mpCur');
+    var durEl = document.getElementById('mpDur');
+    var btnPlay = document.getElementById('mpPlay');
+    var btnPrev = document.getElementById('mpPrev');
+    var btnNext = document.getElementById('mpNext');
+    var btnMode = document.getElementById('mpMode');
+    var btnList = document.getElementById('mpListBtn');
+    var btnClose = document.getElementById('mpClose');
+    var vol = document.getElementById('mpVol');
+    var listEl = document.getElementById('mpPlaylist');
+    if (!audio || !fab || !panel) return;
+
+    var STORE = 'gravity-music';
+    var state = { volume: musicConfig.volume, mode: 'list', track: 0 };
+    try {
+      var saved = JSON.parse(localStorage.getItem(STORE) || '{}');
+      if (typeof saved.volume === 'number') state.volume = saved.volume;
+      if (saved.mode) state.mode = saved.mode;
+      if (typeof saved.track === 'number') state.track = saved.track;
+    } catch (e) {}
+
+    var tracks = []; // 歌单（懒加载）
+    var loading = false;
+    var loadFailed = false;
+    var playing = false;
+    var failStreak = 0; // 连续播放失败次数，防止死循环切歌
+    var wantPlay = false; // 用户在加载中点了播放 → 加载完自动开播
+    var waiters = []; // 等待歌单加载完成的回调队列
+    var lyrics = []; // 当前歌词 [{t, text}]
+    var lrcTrack = -1; // 已加载歌词的曲目序号
+
+    function save() {
+      try {
+        localStorage.setItem(STORE, JSON.stringify(state));
+      } catch (e) {}
+    }
+
+    function fmt(s) {
+      if (!isFinite(s) || s < 0) return '0:00';
+      var m = Math.floor(s / 60);
+      var ss = Math.floor(s % 60);
+      return m + ':' + (ss < 10 ? '0' : '') + ss;
+    }
+
+    /* ---------- 歌单加载：主接口 → 备用接口 → 本地兜底 ---------- */
+    function apiUrls() {
+      var r = String(Date.now());
+      return musicConfig.apis.map(function (tpl) {
+        return tpl
+          .replace(':server', musicConfig.server)
+          .replace(':type', musicConfig.type)
+          .replace(':id', musicConfig.id)
+          .replace(':r', r);
+      });
+    }
+
+    function normalize(data) {
+      /* Meting 各镜像的字段名略有差异：name/title、artist/author、cover/pic 都见过 */
+      var arr = Array.isArray(data) ? data : data && Array.isArray(data.data) ? data.data : [];
+      return arr
+        .map(function (t) {
+          return {
+            name: t.name || t.title || '未知曲目',
+            artist: t.artist || t.author || t.singer || '未知歌手',
+            url: t.url || '',
+            cover: t.cover || t.pic || '',
+            lrc: t.lrc || '',
+          };
+        })
+        .filter(function (t) {
+          return t.url;
+        });
+    }
+
+    function loadPlaylist(done) {
+      if (tracks.length) return done(true);
+      /* 加载已在进行：把回调排队，加载结束统一唤醒（修：加载中点播放会永久等死的 bug） */
+      if (loading) {
+        waiters.push(done);
+        return;
+      }
+      loading = true;
+      artistEl.textContent = '正在加载歌单…';
+
+      var finish = function (ok) {
+        loading = false;
+        var cbs = waiters.splice(0);
+        done(ok);
+        cbs.forEach(function (cb) {
+          cb(ok);
+        });
+      };
+
+      var urls = apiUrls();
+      var attempt = function (i) {
+        if (i >= urls.length) {
+          /* 三个接口都失败 → 本地兜底 */
+          tracks = musicConfig.localPlaylist.slice();
+          loadFailed = true;
+          artistEl.textContent = tracks.length ? '在线歌单暂不可用，先听兜底的' : '歌单加载失败';
+          finish(tracks.length > 0);
+          return;
+        }
+        fetch(urls[i], { signal: AbortSignal.timeout ? AbortSignal.timeout(9000) : undefined })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            var list = normalize(data);
+            if (!list.length) throw new Error('empty');
+            tracks = list;
+            finish(true);
+          })
+          .catch(function () {
+            attempt(i + 1);
+          });
+      };
+      attempt(0);
+    }
+
+    /* ---------- 歌词：只显示当前一行，够用也轻快 ---------- */
+    function parseLrc(text) {
+      var out = [];
+      text.split('\n').forEach(function (line) {
+        var m = line.match(/\[(\d+):(\d+(?:\.\d+)?)\](.*)/);
+        if (m) {
+          var t = parseInt(m[1], 10) * 60 + parseFloat(m[2]);
+          var txt = m[3].trim();
+          if (txt) out.push({ t: t, text: txt });
+        }
+      });
+      return out.sort(function (a, b) {
+        return a.t - b.t;
+      });
+    }
+
+    function loadLrc(i) {
+      lyrics = [];
+      lyricEl.textContent = '♪';
+      var tr = tracks[i];
+      if (!tr || !tr.lrc || lrcTrack === i) return;
+      lrcTrack = i;
+      fetch(tr.lrc)
+        .then(function (r) {
+          return r.text();
+        })
+        .then(function (text) {
+          if (lrcTrack === i) lyrics = parseLrc(text);
+        })
+        .catch(function () {});
+    }
+
+    function syncLyric(t) {
+      if (!lyrics.length) return;
+      var cur = '';
+      for (var i = 0; i < lyrics.length; i++) {
+        if (lyrics[i].t <= t + 0.3) cur = lyrics[i].text;
+        else break;
+      }
+      if (cur && lyricEl.textContent !== cur) lyricEl.textContent = cur;
+    }
+
+    /* ---------- 播放控制 ---------- */
+    function setCover(url) {
+      if (url) {
+        cover.src = url;
+        cover.hidden = false;
+        coverPh.style.display = 'none';
+        fabCover.src = url;
+        fabCover.hidden = false;
+      } else {
+        cover.hidden = true;
+        coverPh.style.display = '';
+        fabCover.hidden = true;
+      }
+    }
+
+    function setTrack(i, autoplay) {
+      if (!tracks.length) return;
+      state.track = ((i % tracks.length) + tracks.length) % tracks.length;
+      var tr = tracks[state.track];
+      titleEl.textContent = tr.name;
+      titleEl.title = tr.name;
+      artistEl.textContent = tr.artist;
+      audio.src = tr.url;
+      setCover(tr.cover);
+      loadLrc(state.track);
+      failStreak = 0;
+      renderList();
+      save();
+      if (autoplay) play();
+    }
+
+    function play() {
+      if (!tracks.length) {
+        loadPlaylist(function (ok) {
+          if (ok) setTrack(state.track, true);
+        });
+        return;
+      }
+      audio.play().catch(function () {});
+    }
+
+    function pause() {
+      audio.pause();
+    }
+
+    function next(manual) {
+      if (!tracks.length) return;
+      if (state.mode === 'random' && tracks.length > 1) {
+        var i = state.track;
+        while (i === state.track) i = Math.floor(Math.random() * tracks.length);
+        setTrack(i, playing || manual);
+      } else {
+        setTrack(state.track + 1, playing || manual);
+      }
+    }
+
+    function prev() {
+      if (!tracks.length) return;
+      setTrack(state.track - 1, playing || true);
+    }
+
+    /* ---------- UI 渲染 ---------- */
+    function setPlaying(on) {
+      playing = on;
+      btnPlay.querySelector('.ico-play').style.display = on ? 'none' : '';
+      btnPlay.querySelector('.ico-pause').style.display = on ? '' : 'none';
+      btnPlay.setAttribute('aria-label', on ? '暂停' : '播放');
+      disc.classList.toggle('is-spinning', on);
+    }
+
+    var MODE_LABEL = { list: '列表循环', one: '单曲循环', random: '随机播放' };
+    function setMode(m) {
+      state.mode = m;
+      btnMode.querySelector('.ico-list').style.display = m === 'list' ? '' : 'none';
+      btnMode.querySelector('.ico-one').style.display = m === 'one' ? '' : 'none';
+      btnMode.querySelector('.ico-random').style.display = m === 'random' ? '' : 'none';
+      btnMode.title = MODE_LABEL[m];
+      save();
+    }
+
+    function renderList() {
+      if (listEl.hidden) return;
+      listEl.innerHTML = tracks
+        .map(function (t, i) {
+          return (
+            '<button type="button" class="mp-track' +
+            (i === state.track ? ' is-current' : '') +
+            '" data-i="' +
+            i +
+            '"><span class="mp-track__name">' +
+            t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+            '</span><span class="mp-track__artist">' +
+            t.artist.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+            '</span></button>'
+          );
+        })
+        .join('');
+    }
+
+    /* ---------- 事件 ---------- */
+    fab.addEventListener('click', function () {
+      var willOpen = panel.hidden;
+      panel.hidden = !willOpen;
+      fab.classList.toggle('is-open', willOpen);
+      if (willOpen && !tracks.length && !loading) {
+        /* 展开面板时静默预载歌单（不自动播放），点播放时就是秒开 */
+        loadPlaylist(function (ok) {
+          if (ok && !audio.src) setTrack(state.track, false);
+        });
+      }
+      if (willOpen && !listEl.hidden) renderList();
+    });
+
+    btnClose.addEventListener('click', function () {
+      panel.hidden = true;
+      fab.classList.remove('is-open');
+    });
+
+    btnPlay.addEventListener('click', function () {
+      if (playing) pause();
+      else play();
+    });
+    btnPrev.addEventListener('click', prev);
+    btnNext.addEventListener('click', function () {
+      next(true);
+    });
+
+    btnMode.addEventListener('click', function () {
+      setMode(state.mode === 'list' ? 'one' : state.mode === 'one' ? 'random' : 'list');
+    });
+
+    btnList.addEventListener('click', function () {
+      listEl.hidden = !listEl.hidden;
+      if (!listEl.hidden) renderList();
+    });
+
+    listEl.addEventListener('click', function (e) {
+      var btn = e.target.closest('.mp-track');
+      if (!btn) return;
+      setTrack(parseInt(btn.dataset.i, 10), true);
+    });
+
+    vol.value = String(Math.round(state.volume * 100));
+    audio.volume = state.volume;
+    vol.addEventListener('input', function () {
+      state.volume = vol.value / 100;
+      audio.volume = state.volume;
+      save();
+    });
+
+    /* 进度条点击跳转 */
+    function seek(e) {
+      var rect = progress.getBoundingClientRect();
+      var ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+      if (isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
+    }
+    progress.addEventListener('click', seek);
+
+    audio.addEventListener('play', function () {
+      setPlaying(true);
+    });
+    audio.addEventListener('pause', function () {
+      setPlaying(false);
+    });
+    audio.addEventListener('ended', function () {
+      if (state.mode === 'one') {
+        audio.currentTime = 0;
+        audio.play().catch(function () {});
+      } else {
+        next(false);
+      }
+    });
+    audio.addEventListener('error', function () {
+      /* 版权等原因拿不到流时自动切下一首，连续失败 5 次就停下 */
+      if (!tracks.length) return;
+      failStreak++;
+      if (failStreak >= 5) {
+        artistEl.textContent = '这首歌播不了，歇一下';
+        return;
+      }
+      next(false);
+      if (playing) play();
+    });
+    audio.addEventListener('timeupdate', function () {
+      var d = audio.duration;
+      if (isFinite(d) && d > 0) {
+        bar.style.width = (audio.currentTime / d) * 100 + '%';
+        durEl.textContent = fmt(d);
+      }
+      curEl.textContent = fmt(audio.currentTime);
+      syncLyric(audio.currentTime);
+    });
+
+    setMode(state.mode);
+  })();
+</script>

@@ -5,6 +5,9 @@ import '../styles/components.css';
    —— 想整体回退只要删掉这一行 */
 import '../styles/enhance.css';
 import LeafFall from '@components/LeafFall.astro';
+import MusicPlayer from '@components/MusicPlayer.astro';
+import SearchModal from '@components/SearchModal.astro';
+import ClickEffect from '@components/ClickEffect.astro';
 import { SITE } from '@/config';
 import { withBase } from '@/utils/url';
 
@@ -107,6 +110,11 @@ const pageDesc = description || SITE.description;
         stroke-linecap="round"
         stroke-linejoin="round"><path d="m18 15-6-6-6 6"></path></svg>
     </button>
+
+    <!-- 音乐播放器（左下悬浮）/ 站内搜索 / 点击彩蛋 -->
+    <MusicPlayer />
+    <SearchModal />
+    <ClickEffect />
 
     <script>
       /* ================= 主题切换 ================= */
