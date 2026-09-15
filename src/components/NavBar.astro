@@ -149,36 +149,49 @@ const iconSvg = (key: string) =>
 </nav>
 
 <script>
-  // 移动端汉堡菜单 + 下拉点击展开（桌面端悬停已经由 CSS 处理）
-  const navbar = document.querySelector('.navbar');
-  const toggle = navbar?.querySelector('.nav-toggle');
-  const links = navbar?.querySelector('.nav-links');
+  /* 这段是 Astro 打包的模块脚本 —— 在 ClientRouter 下它「只会执行一次」，
+     跳页后导航栏是新的 DOM，但脚本不会再跑。所以这里不能用"取到元素再绑定"
+     的写法，全部改成 document 级事件委托：绑一次，跨页面一直有效。
 
-  toggle?.addEventListener('click', () => {
-    const open = links?.classList.toggle('open');
-    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
-  });
+     另外注意：汉堡菜单（.nav-toggle）的开关统一由 Layout 的委托处理，
+     这里不再重复绑定 —— 之前两处都绑了，冒泡时 toggle 两次相互抵消，
+     结果移动端菜单根本打不开。 */
 
-  navbar?.querySelectorAll('.nav-dropdown-trigger').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const dropdown = btn.closest('.nav-dropdown');
-      const wasOpen = dropdown?.classList.contains('open');
-      navbar.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
-      navbar.querySelectorAll('.nav-dropdown-trigger').forEach((b) => b.setAttribute('aria-expanded', 'false'));
-      if (!wasOpen && dropdown) {
-        dropdown.classList.add('open');
-        btn.setAttribute('aria-expanded', 'true');
+  const closeDropdowns = () => {
+    const navbar = document.querySelector('.navbar');
+    if (!navbar) return;
+    navbar.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
+    navbar
+      .querySelectorAll('.nav-dropdown-trigger')
+      .forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  };
+
+  if (!(window as any).__cabinNavBound) {
+    (window as any).__cabinNavBound = true;
+
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      const navbar = document.querySelector('.navbar');
+      if (!navbar) return;
+
+      const trigger = target.closest('.nav-dropdown-trigger');
+      if (trigger) {
+        const dropdown = trigger.closest('.nav-dropdown');
+        const wasOpen = dropdown?.classList.contains('open');
+        closeDropdowns();
+        if (!wasOpen && dropdown) {
+          dropdown.classList.add('open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+        return;
       }
-    });
-  });
 
-  // 点其他地方 / 按 Esc 收起
-  document.addEventListener('click', () => {
-    navbar?.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
-  });
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape')
-      navbar?.querySelectorAll('.nav-dropdown.open').forEach((d) => d.classList.remove('open'));
-  });
+      /* 点空白处收起（桌面端悬停展开由 CSS 处理，这里只管点击态） */
+      if (!target.closest('.nav-dropdown')) closeDropdowns();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeDropdowns();
+    });
+  }
 </script>

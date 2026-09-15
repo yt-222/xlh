@@ -15,6 +15,11 @@ const COLORS = ['#3b82f6', '#0ea5e9', '#f59e0b', '#f97362', '#10b981', '#fb7185'
   (function () {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
+    /* 它在 Layout 的常驻层里，正常情况下跳页不会重跑；
+       万一重跑也只允许绑一次，否则点一下会蹦出两套词。 */
+    if (window.__clickEffectBound) return;
+    window.__clickEffectBound = true;
+
     var live = 0;
     var MAX = 12;
 

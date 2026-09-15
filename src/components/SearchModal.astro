@@ -58,6 +58,11 @@ import { withBase } from '@/utils/url';
     var total = document.getElementById('searchTotal');
     if (!modal || !input || !results) return;
 
+    /* 它同样在 Layout 的常驻层里，正常不会重跑；
+       万一重跑也只绑一次，否则按一下 / 会开出两层模态框。 */
+    if (window.__searchBound) return;
+    window.__searchBound = true;
+
     var index = null; // 懒加载的搜索索引
     var loading = false;
     var active = -1; // 键盘选中的结果序号

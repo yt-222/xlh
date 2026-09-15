@@ -4,12 +4,22 @@
  *
  * 设计要点：
  * - 左下角一个旋转封面球，点开是完整面板（封面/歌名/歌手/歌词/进度/控制/歌单）
- * - 歌单走 Meting API（主接口 + 两个备用），全部失败回落到本地兜底曲目
+ * - 音源三级降级，优先用「自己的」：
+ *     ① 自托管曲库 /music/manifest.json —— 你自己放进去的音频文件，
+ *        永远完整可播（自己的会员歌放这里最合适，见项目根目录 MUSIC.md）
+ *     ② Meting 在线接口（多镜像依次尝试，全部失败才放弃）
+ *     ③ 内置兜底曲目
  * - 懒加载：第一次点播放或展开面板才去拉歌单，首屏零开销
  * - 纯原生 <audio>，不引第三方库（APlayer + MetingJS 要 100KB+，不值）
  * - 音量 / 播放模式 / 上次播的歌 记在 localStorage
+ * - 跨页面常驻：它被包在 Layout 的 transition:persist 容器里，跳页时 DOM 整个保留，
+ *   所以 <audio> 不会被销毁 —— 这是「换页面音乐不断」的关键。正因如此，
+ *   这里的初始化必须是幂等的（下方有守卫），否则重跑会绑定两层事件。
  */
 import { MUSIC } from '@/config';
+
+/* 站点可能部署在子路径下，曲库清单要用正确的 base 前缀 */
+const baseUrl = import.meta.env.BASE_URL || '/';
 ---
 
 <div class="music-player" id="musicPlayer">
@@ -68,6 +78,7 @@ import { MUSIC } from '@/config';
     </div>
     <div class="mp-time">
       <span id="mpCur">0:00</span>
+      <span class="mp-src" id="mpSrc">—</span>
       <span id="mpDur">0:00</span>
     </div>
 
@@ -129,8 +140,17 @@ import { MUSIC } from '@/config';
   <audio id="mpAudio" preload="none"></audio>
 </div>
 
-<script is:inline define:vars={{ musicConfig: MUSIC }}>
+<script is:inline define:vars={{ musicConfig: MUSIC, baseUrl }}>
   (function () {
+    /* ===== 幂等守卫 =====
+       播放器位于 Layout 的常驻层，跳页时 DOM 被原样保留、脚本通常不会重跑；
+       但万一某些情况下重跑了（例如直接刷新到本页），重复绑定会让一次点击触发两遍。
+       所以这里只允许初始化一次。 */
+    var root = document.getElementById('musicPlayer');
+    if (!root) return;
+    if (root.dataset.inited === '1') return;
+    root.dataset.inited = '1';
+
     var audio = document.getElementById('mpAudio');
     var fab = document.getElementById('mpFab');
     var disc = document.getElementById('mpFabDisc');
@@ -145,6 +165,7 @@ import { MUSIC } from '@/config';
     var bar = document.getElementById('mpBar');
     var curEl = document.getElementById('mpCur');
     var durEl = document.getElementById('mpDur');
+    var srcEl = document.getElementById('mpSrc');
     var btnPlay = document.getElementById('mpPlay');
     var btnPrev = document.getElementById('mpPrev');
     var btnNext = document.getElementById('mpNext');
@@ -166,13 +187,13 @@ import { MUSIC } from '@/config';
 
     var tracks = []; // 歌单（懒加载）
     var loading = false;
-    var loadFailed = false;
     var playing = false;
     var failStreak = 0; // 连续播放失败次数，防止死循环切歌
-    var wantPlay = false; // 用户在加载中点了播放 → 加载完自动开播
-    var waiters = []; // 等待歌单加载完成的回调队列
+    var waiters = []; // 加载中点播放的回调队列
     var lyrics = []; // 当前歌词 [{t, text}]
     var lrcTrack = -1; // 已加载歌词的曲目序号
+    var badTracks = {}; // 记下播不了的曲目，列表里灰掉，不再反复试
+    var sourceLabel = ''; // '本地' / '在线'
 
     function save() {
       try {
@@ -187,7 +208,50 @@ import { MUSIC } from '@/config';
       return m + ':' + (ss < 10 ? '0' : '') + ss;
     }
 
-    /* ---------- 歌单加载：主接口 → 备用接口 → 本地兜底 ---------- */
+    /* 相对路径 → 带 base 的绝对路径（曲库清单里通常写相对文件名） */
+    function abs(p) {
+      if (!p) return '';
+      if (/^(https?:)?\/\//.test(p) || p.charAt(0) === '/') return p;
+      return baseUrl.replace(/\/$/, '') + '/' + p.replace(/^\//, '');
+    }
+
+    /* ---------- ① 自托管曲库 ---------- */
+    function loadLocalLibrary(done) {
+      var url = abs(musicConfig.localManifest);
+      if (!musicConfig.localManifest) return done(false);
+      fetch(url, { cache: 'no-cache' })
+        .then(function (r) {
+          if (!r.ok) throw new Error('no manifest');
+          return r.json();
+        })
+        .then(function (data) {
+          var arr = (data && data.tracks) || (Array.isArray(data) ? data : []);
+          var list = arr
+            .map(function (t) {
+              return {
+                name: t.name || t.title || '未命名曲目',
+                artist: t.artist || t.author || '',
+                /* file 是相对 music/ 目录的文件名；也允许直接写完整 url */
+                url: t.url ? abs(t.url) : t.file ? abs(musicConfig.localDir + '/' + t.file) : '',
+                cover: t.cover ? abs(musicConfig.localDir + '/' + t.cover) : '',
+                lrc: t.lrc ? abs(musicConfig.localDir + '/' + t.lrc) : '',
+                local: true,
+              };
+            })
+            .filter(function (t) {
+              return t.url;
+            });
+          if (!list.length) throw new Error('empty manifest');
+          tracks = list;
+          sourceLabel = '本地曲库';
+          done(true);
+        })
+        .catch(function () {
+          done(false);
+        });
+    }
+
+    /* ---------- ② Meting 在线歌单 ---------- */
     function apiUrls() {
       var r = String(Date.now());
       return musicConfig.apis.map(function (tpl) {
@@ -200,7 +264,7 @@ import { MUSIC } from '@/config';
     }
 
     function normalize(data) {
-      /* Meting 各镜像的字段名略有差异：name/title、artist/author、cover/pic 都见过 */
+      /* Meting 各镜像的字段名略有差异：name/title、artist/author/singer、cover/pic 都见过 */
       var arr = Array.isArray(data) ? data : data && Array.isArray(data.data) ? data.data : [];
       return arr
         .map(function (t) {
@@ -210,6 +274,7 @@ import { MUSIC } from '@/config';
             url: t.url || '',
             cover: t.cover || t.pic || '',
             lrc: t.lrc || '',
+            local: false,
           };
         })
         .filter(function (t) {
@@ -217,6 +282,29 @@ import { MUSIC } from '@/config';
         });
     }
 
+    function loadOnline(done) {
+      var urls = apiUrls();
+      var attempt = function (i) {
+        if (i >= urls.length) return done(false);
+        fetch(urls[i], { signal: AbortSignal.timeout ? AbortSignal.timeout(9000) : undefined })
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            var list = normalize(data);
+            if (!list.length) throw new Error('empty');
+            tracks = list;
+            sourceLabel = musicConfig.server === 'tencent' ? 'QQ音乐' : '网易云';
+            done(true);
+          })
+          .catch(function () {
+            attempt(i + 1);
+          });
+      };
+      attempt(0);
+    }
+
+    /* ---------- ③ 总入口：本地 → 在线 → 兜底 ---------- */
     function loadPlaylist(done) {
       if (tracks.length) return done(true);
       /* 加载已在进行：把回调排队，加载结束统一唤醒（修：加载中点播放会永久等死的 bug） */
@@ -236,31 +324,27 @@ import { MUSIC } from '@/config';
         });
       };
 
-      var urls = apiUrls();
-      var attempt = function (i) {
-        if (i >= urls.length) {
-          /* 三个接口都失败 → 本地兜底 */
-          tracks = musicConfig.localPlaylist.slice();
-          loadFailed = true;
-          artistEl.textContent = tracks.length ? '在线歌单暂不可用，先听兜底的' : '歌单加载失败';
-          finish(tracks.length > 0);
+      loadLocalLibrary(function (hasLocal) {
+        if (hasLocal) {
+          finish(true);
           return;
         }
-        fetch(urls[i], { signal: AbortSignal.timeout ? AbortSignal.timeout(9000) : undefined })
-          .then(function (r) {
-            return r.json();
-          })
-          .then(function (data) {
-            var list = normalize(data);
-            if (!list.length) throw new Error('empty');
-            tracks = list;
+        loadOnline(function (hasOnline) {
+          if (hasOnline) {
             finish(true);
-          })
-          .catch(function () {
-            attempt(i + 1);
-          });
-      };
-      attempt(0);
+            return;
+          }
+          /* 两级都失败 → 内置兜底曲目 */
+          tracks = (musicConfig.localPlaylist || []).slice();
+          if (tracks.length) {
+            sourceLabel = '兜底';
+            artistEl.textContent = '在线歌单暂不可用，先听兜底的';
+          } else {
+            artistEl.textContent = '歌单加载失败';
+          }
+          finish(tracks.length > 0);
+        });
+      });
     }
 
     /* ---------- 歌词：只显示当前一行，够用也轻快 ---------- */
@@ -326,10 +410,11 @@ import { MUSIC } from '@/config';
       var tr = tracks[state.track];
       titleEl.textContent = tr.name;
       titleEl.title = tr.name;
-      artistEl.textContent = tr.artist;
+      artistEl.textContent = tr.artist || sourceLabel;
       audio.src = tr.url;
       setCover(tr.cover);
       loadLrc(state.track);
+      if (srcEl) srcEl.textContent = sourceLabel || '—';
       failStreak = 0;
       renderList();
       save();
@@ -363,7 +448,7 @@ import { MUSIC } from '@/config';
 
     function prev() {
       if (!tracks.length) return;
-      setTrack(state.track - 1, playing || true);
+      setTrack(state.track - 1, true);
     }
 
     /* ---------- UI 渲染 ---------- */
@@ -385,6 +470,10 @@ import { MUSIC } from '@/config';
       save();
     }
 
+    function esc(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
     function renderList() {
       if (listEl.hidden) return;
       listEl.innerHTML = tracks
@@ -392,12 +481,13 @@ import { MUSIC } from '@/config';
           return (
             '<button type="button" class="mp-track' +
             (i === state.track ? ' is-current' : '') +
+            (badTracks[i] ? ' is-bad' : '') +
             '" data-i="' +
             i +
             '"><span class="mp-track__name">' +
-            t.name.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+            esc(t.name) +
             '</span><span class="mp-track__artist">' +
-            t.artist.replace(/&/g, '&amp;').replace(/</g, '&lt;') +
+            esc(badTracks[i] ? '播不了' : t.artist) +
             '</span></button>'
           );
         })
@@ -456,12 +546,11 @@ import { MUSIC } from '@/config';
     });
 
     /* 进度条点击跳转 */
-    function seek(e) {
+    progress.addEventListener('click', function (e) {
       var rect = progress.getBoundingClientRect();
       var ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
       if (isFinite(audio.duration)) audio.currentTime = ratio * audio.duration;
-    }
-    progress.addEventListener('click', seek);
+    });
 
     audio.addEventListener('play', function () {
       setPlaying(true);
@@ -477,17 +566,24 @@ import { MUSIC } from '@/config';
         next(false);
       }
     });
+
     audio.addEventListener('error', function () {
-      /* 版权等原因拿不到流时自动切下一首，连续失败 5 次就停下 */
+      /* 拿不到流的原因通常是版权/付费限制（比如 QQ 音乐的会员歌）。
+         这类曲子不重试，标记后自动跳到下一首；连续 5 首都失败就停下，
+         免得整个歌单都是黑胶的时候疯狂切歌。 */
       if (!tracks.length) return;
+      badTracks[state.track] = 1;
       failStreak++;
+      renderList();
       if (failStreak >= 5) {
-        artistEl.textContent = '这首歌播不了，歇一下';
+        artistEl.textContent = '这几首都播不了（多为会员限定）';
+        setPlaying(false);
         return;
       }
       next(false);
-      if (playing) play();
+      if (playing || failStreak > 0) audio.play().catch(function () {});
     });
+
     audio.addEventListener('timeupdate', function () {
       var d = audio.duration;
       if (isFinite(d) && d > 0) {
@@ -499,5 +595,8 @@ import { MUSIC } from '@/config';
     });
 
     setMode(state.mode);
+
+    /* 暴露给外部（调试 / 后续扩展用），顺便证明初始化只做了一次 */
+    window.__gravityMusic = { state: state, getTracks: function () { return tracks; } };
   })();
 </script>
