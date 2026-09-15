@@ -130,10 +130,20 @@ const titleHtml = SITE.title.includes('引力')
   </button>
 </section>
 
-<script is:inline define:vars={{ taglines: [...SITE.taglines] }}>
+<script is:inline data-astro-rerun define:vars={{ taglines: [...SITE.taglines] }}>
   /* 打字机：敲字 → 停顿 → 回删 → 下一句，循环。
-     系统开了「减少动态」就只静态显示第一句。 */
+     系统开了「减少动态」就只静态显示第一句。
+
+     data-astro-rerun：首页的这段脚本每次内容都一样，不加它 Astro 会在
+     第二次进入首页时直接跳过，打字机就停在原地不动了。 */
   (function () {
+    /* 这段脚本跳页后会重新执行一次，递归的 setTimeout 必须先清掉，
+       否则旧循环还在操作已经被移除的元素 —— 白白烧 CPU。 */
+    if (window.__typedTimer) {
+      clearTimeout(window.__typedTimer);
+      window.__typedTimer = null;
+    }
+
     var el = document.getElementById('typedText');
     if (!el || !taglines.length) return;
 
@@ -148,6 +158,11 @@ const titleHtml = SITE.title.includes('引力')
     var pos = 0;
     var deleting = false;
 
+    /* 计时器句柄统一存到 window 上，换页时好清掉 */
+    function later(ms) {
+      return (window.__typedTimer = setTimeout(tick, ms));
+    }
+
     function tick() {
       var text = taglines[line];
       if (!deleting) {
@@ -155,18 +170,18 @@ const titleHtml = SITE.title.includes('引力')
         el.textContent = text.slice(0, pos);
         if (pos >= text.length) {
           deleting = true;
-          return setTimeout(tick, 2200); /* 完整显示一会 */
+          return later(2200); /* 完整显示一会 */
         }
-        return setTimeout(tick, 90 + Math.random() * 70); /* 人手敲字的节奏感 */
+        return later(90 + Math.random() * 70); /* 人手敲字的节奏感 */
       }
       pos--;
       el.textContent = text.slice(0, pos);
       if (pos <= 0) {
         deleting = false;
         line = (line + 1) % taglines.length;
-        return setTimeout(tick, 450);
+        return later(450);
       }
-      setTimeout(tick, 32);
+      later(32);
     }
     tick();
   })();

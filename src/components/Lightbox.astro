@@ -95,7 +95,11 @@ const { photos, triggerSelector = '[data-lb-index]' } = Astro.props;
   <div class="lightbox__thumbs" id="lbThumbs"></div>
 </div>
 
-<script is:inline define:vars={{ photos, triggerSelector }}>
+<script is:inline data-astro-rerun define:vars={{ photos, triggerSelector }}>
+  /* data-astro-rerun：画廊页每次生成的内容完全一样，不加它 Astro 会在
+     第二次进入画廊时跳过整段脚本，灯箱就点不开了。
+     下面所有 document 级监听都用 window.__lbBound 守卫，只绑一次，
+     并通过 window.__lbApi 转发给「当前页面上的那个灯箱实例」。 */
   (function () {
     var items = photos || [];
     if (!items.length) return;
@@ -201,15 +205,32 @@ const { photos, triggerSelector = '[data-lb-index]' } = Astro.props;
       }, 300);
     }
 
-    /* ---------- 事件委托：以后动态加的照片也能点开 ---------- */
-    document.addEventListener('click', function (e) {
-      var el = e.target.closest(triggerSelector);
-      if (!el) return;
-      var i = Number(el.dataset.lbIndex);
-      if (!Number.isFinite(i)) return;
-      e.preventDefault();
-      open(i);
-    });
+    /* ---------- 事件委托：以后动态加的照片也能点开 ----------
+       这两个是 document 级监听。跳页后本脚本会重跑，若每次都直接绑，
+       一次点击/按键会被处理好几遍 —— 所以只绑一次，
+       通过 window.__lbApi 转发给「当前页面上的那个灯箱实例」。 */
+    if (!window.__lbBound) {
+      window.__lbBound = true;
+
+      document.addEventListener('click', function (e) {
+        var api = window.__lbApi;
+        if (!api) return;
+        var el = e.target.closest(api.triggerSelector);
+        if (!el) return;
+        var i = Number(el.dataset.lbIndex);
+        if (!Number.isFinite(i)) return;
+        e.preventDefault();
+        api.open(i);
+      });
+
+      document.addEventListener('keydown', function (e) {
+        var api = window.__lbApi;
+        if (!api || !api.isOpen()) return;
+        if (e.key === 'Escape') api.close();
+        else if (e.key === 'ArrowLeft') api.show(api.index() - 1);
+        else if (e.key === 'ArrowRight') api.show(api.index() + 1);
+      });
+    }
 
     btnPrev.addEventListener('click', function () {
       show(index - 1);
@@ -222,13 +243,6 @@ const { photos, triggerSelector = '[data-lb-index]' } = Astro.props;
     /* 点空白处关闭（点在图片或按钮上不关） */
     box.addEventListener('click', function (e) {
       if (e.target === box || e.target.classList.contains('lightbox__stage')) close();
-    });
-
-    document.addEventListener('keydown', function (e) {
-      if (!opened) return;
-      if (e.key === 'Escape') close();
-      else if (e.key === 'ArrowLeft') show(index - 1);
-      else if (e.key === 'ArrowRight') show(index + 1);
     });
 
     /* 移动端左右滑动切换 */
@@ -251,5 +265,20 @@ const { photos, triggerSelector = '[data-lb-index]' } = Astro.props;
       },
       { passive: true }
     );
+
+    /* 把本实例的入口挂到 window，供上面那个「只绑一次」的 document 监听调用。
+       跳页后由新实例覆盖它，旧实例随之失效 —— 不会出现两个灯箱抢键盘事件。 */
+    window.__lbApi = {
+      triggerSelector: triggerSelector,
+      open: open,
+      close: close,
+      show: show,
+      isOpen: function () {
+        return opened;
+      },
+      index: function () {
+        return index;
+      },
+    };
   })();
 </script>

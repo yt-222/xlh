@@ -67,8 +67,9 @@ const enabled = hasCoords || city.length > 0;
     if (clockEl)
       clockEl.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   }
-  tick();
-  setInterval(tick, 1000);
+  /* tick() 与天气请求的启动都放到文件末尾的 initWeather 里 ——
+     这段是打包模块，在 ClientRouter 下只会执行一次，跳页之后的
+     新 DOM 只能靠 astro:page-load 重新初始化，否则时钟会停摆 */
 
   /* ---------- WMO 天气代码 → emoji + 中文 ---------- */
   const WMO: Record<number, [string, string, string?]> = {
@@ -202,11 +203,25 @@ const enabled = hasCoords || city.length > 0;
     }
   }
 
-  const card = document.getElementById('weather-card');
-  if (card) {
-    const lat = card.dataset.lat?.trim() ?? '';
-    const lon = card.dataset.lon?.trim() ?? '';
-    const city = card.dataset.city?.trim() ?? '';
-    if ((lat && lon) || city) loadWeather(lat, lon, city);
+  /* ---------- 初始化：每次换页都要重跑 ----------
+     首次加载和每次 ClientRouter 跳转后都会触发 astro:page-load，
+     所以这里重新取元素、重启时钟、重新拉一次天气。 */
+  function initWeather() {
+    /* 时钟：旧的 interval 必须先清掉，不然每跳一页就多一个在后台空转 */
+    tick();
+    const w = window as any;
+    if (w.__weatherTimer) clearInterval(w.__weatherTimer);
+    w.__weatherTimer = setInterval(tick, 1000);
+
+    /* 天气：新页面的元素是新的，必须重新取一次 */
+    const card = document.getElementById('weather-card');
+    if (card) {
+      const lat = card.dataset.lat?.trim() ?? '';
+      const lon = card.dataset.lon?.trim() ?? '';
+      const city = card.dataset.city?.trim() ?? '';
+      if ((lat && lon) || city) loadWeather(lat, lon, city);
+    }
   }
+
+  document.addEventListener('astro:page-load', initWeather);
 </script>

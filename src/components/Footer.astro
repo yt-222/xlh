@@ -2,6 +2,11 @@
 /**
  * 页脚 —— Butterfly 风格的多行信息区：
  *   版权 / 技术支持 / 站点运行时间（每秒跳动）/ 不蒜子访问统计（加载失败就静默隐藏）
+ *
+ * 注意：跳页后本组件的脚本会重新执行一次，所以
+ *   ① 计时器句柄存在 window 上，重跑前先清掉旧的；
+ *   ② 不蒜子的第三方脚本只插入一次，数字缓存到 sessionStorage，
+ *      换页时直接用缓存渲染，不会闪也不会重复请求。
  */
 import { SITE } from '@/config';
 import OrbitLogo from '@components/OrbitLogo.astro';
@@ -39,9 +44,18 @@ const year = new Date().getFullYear();
   </div>
 </footer>
 
-<script is:inline>
+<script is:inline data-astro-rerun>
   (function () {
-    /* 运行时间 */
+    var w = window;
+
+    /* ⚠️ 为什么必须带 data-astro-rerun：
+       Astro 的 ClientRouter 按「脚本文本内容」给脚本去重（detectScriptExecuted），
+       同内容的 inline 脚本第二次出现时会被直接标记为「已执行」并跳过。
+       页脚脚本在所有页面都一模一样 —— 不声明 rerun 的话，只有首次进入网站时生效，
+       之后每次站内跳页，运行时间都会退回占位文案、停留不动。
+       （实测：跳页前正常显示，跳页后 window.__footerTimer 不再被重新赋值。） */
+
+    /* ---------- 运行时间 ---------- */
     var el = document.getElementById('footerRuntime');
     if (el) {
       var birth = new Date(el.dataset.birthday + 'T00:00:00+08:00').getTime();
@@ -57,40 +71,65 @@ const year = new Date().getFullYear();
         el.textContent =
           '这间小屋已在引力中运行 ' + d + ' 天 ' + pad(h) + ' 时 ' + pad(m) + ' 分 ' + pad(s) + ' 秒';
       };
+      /* 先清掉上一页留下的定时器，否则每跳一次页就多一个在后台空转 */
+      if (w.__footerTimer) clearInterval(w.__footerTimer);
       tickRuntime();
-      setInterval(tickRuntime, 1000);
+      w.__footerTimer = setInterval(tickRuntime, 1000);
     }
 
-    /* 不蒜子：异步拉，两次机会，失败就保持隐藏 */
+    /* ---------- 不蒜子：脚本只加载一次，数值缓存复用 ---------- */
     var stats = document.getElementById('footerStats');
     if (stats) {
-      var tries = 0;
-      var loadBusuanzi = function () {
-        tries++;
-        var s = document.createElement('script');
-        s.src = '//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
-        s.async = true;
-        s.onload = function () {
-          /* 脚本跑完后数字需要一点时间填充，轮询等到有值再亮出来 */
-          var wait = setInterval(function () {
-            var pv = document.getElementById('busuanzi_value_site_pv');
-            if (pv && pv.textContent && pv.textContent !== '--') {
-              clearInterval(wait);
-              stats.hidden = false;
-            }
-          }, 300);
-          setTimeout(function () {
-            clearInterval(wait);
-          }, 6000);
-        };
-        s.onerror = function () {
-          if (tries < 2) setTimeout(loadBusuanzi, 4000);
-        };
-        document.body.appendChild(s);
+      var apply = function (pv, uv) {
+        var pvEl = document.getElementById('busuanzi_value_site_pv');
+        var uvEl = document.getElementById('busuanzi_value_site_uv');
+        if (pvEl && pv) pvEl.textContent = pv;
+        if (uvEl && uv) uvEl.textContent = uv;
+        if (pv) stats.hidden = false;
       };
-      /* 空闲时再加载，不抢首屏 */
-      if ('requestIdleCallback' in window) requestIdleCallback(loadBusuanzi, { timeout: 4000 });
-      else setTimeout(loadBusuanzi, 2000);
+
+      /* 有缓存就立刻渲染 —— 换页后不会先显示 -- 再跳数字 */
+      try {
+        var cached = JSON.parse(sessionStorage.getItem('gravity-busuanzi') || 'null');
+        if (cached) apply(cached.pv, cached.uv);
+      } catch (e) {}
+
+      if (!w.__busuanziStarted) {
+        w.__busuanziStarted = true;
+        var tries = 0;
+        var loadBusuanzi = function () {
+          tries++;
+          var s = document.createElement('script');
+          s.src = '//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js';
+          s.async = true;
+          s.onload = function () {
+            /* 脚本跑完后数字需要一点时间填充，轮询等到有值再亮出来 */
+            var wait = setInterval(function () {
+              var pvEl = document.getElementById('busuanzi_value_site_pv');
+              var uvEl = document.getElementById('busuanzi_value_site_uv');
+              if (pvEl && pvEl.textContent && pvEl.textContent !== '--') {
+                clearInterval(wait);
+                var pv = pvEl.textContent;
+                var uv = uvEl ? uvEl.textContent : '';
+                apply(pv, uv);
+                try {
+                  sessionStorage.setItem('gravity-busuanzi', JSON.stringify({ pv: pv, uv: uv }));
+                } catch (e) {}
+              }
+            }, 300);
+            setTimeout(function () {
+              clearInterval(wait);
+            }, 6000);
+          };
+          s.onerror = function () {
+            if (tries < 2) setTimeout(loadBusuanzi, 4000);
+          };
+          document.body.appendChild(s);
+        };
+        /* 空闲时再加载，不抢首屏 */
+        if ('requestIdleCallback' in window) requestIdleCallback(loadBusuanzi, { timeout: 4000 });
+        else setTimeout(loadBusuanzi, 2000);
+      }
     }
   })();
 </script>

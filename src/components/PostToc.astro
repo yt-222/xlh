@@ -29,8 +29,16 @@
   </nav>
 </div>
 
-<script is:inline>
+<script is:inline data-astro-rerun>
   (function () {
+    /* 跳页后本脚本会重跑：先把上一页残留的 observer 断开，
+       否则它会一直观察已经不在文档里的标题。
+       （data-astro-rerun 是必须的：Astro 按脚本文本去重，否则第二篇文章开始就没有目录。） */
+    if (window.__tocObserver) {
+      window.__tocObserver.disconnect();
+      window.__tocObserver = null;
+    }
+
     var wrap = document.getElementById('tocFabWrap');
     var fab = document.getElementById('tocFab');
     var panel = document.getElementById('tocPanel');
@@ -113,17 +121,25 @@
         },
         { rootMargin: '-10% 0px -65% 0px', threshold: 0 }
       );
+      /* 存到 window，下次换页时在开头统一 disconnect */
+      window.__tocObserver = io;
       heads.forEach(function (h) {
         io.observe(h);
       });
     }
 
-    /* 点面板外收起 */
-    document.addEventListener('click', function (e) {
-      if (!panel.hidden && !e.target.closest('#tocFabWrap')) {
-        panel.hidden = true;
-        fab.setAttribute('aria-expanded', 'false');
-      }
-    });
+    /* 点面板外收起 —— document 级监听只绑一次，之后靠 id 现取元素。
+       如果每次跳页都重绑，一次点击会被处理好几遍。 */
+    if (!window.__tocOutsideBound) {
+      window.__tocOutsideBound = true;
+      document.addEventListener('click', function (e) {
+        var p = document.getElementById('tocPanel');
+        var f = document.getElementById('tocFab');
+        if (p && f && !p.hidden && !e.target.closest('#tocFabWrap')) {
+          p.hidden = true;
+          f.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
   })();
 </script>
