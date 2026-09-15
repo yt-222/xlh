@@ -244,25 +244,43 @@ export const GALLERY_LEAD =
  * 音乐播放器配置 —— 参考 momonyako 的 Meting 方案：
  * 打开页面时什么都不加载，第一次点播放/展开才去拉歌单，不影响首屏速度。
  *
- * server: 音乐平台（netease 网易云 / tencent QQ 音乐）
- * type:   playlist 歌单 / song 单曲 / album 专辑
- * id:     歌单 id。默认是网易云「热歌榜」，换成你自己的歌单 id 即可
- *         （网页版网易云打开歌单，地址栏 playlist?id= 后面那串数字）。
+ * 音源优先级：自托管曲库 → 在线歌单 → 内置兜底
  *
- * 主接口挂了会自动换备用接口，三个都挂了就回落到 LOCAL_PLAYLIST。
+ * ⚠️ 关于「会员歌曲只能放 1 分钟 / 干脆播不了」（这点很关键）：
+ * 在线歌单走的是第三方 Meting 公开接口，它以**匿名身份**去平台取播放地址，
+ * 拿不到你的账号 —— 也就是说，你的 QQ 音乐会员权益在这里用不上。
+ * 会员限定曲目会直接取不到音频流，播放器会自动跳到下一首并把它标灰。
+ * 想让这些歌在站内完整播放，唯一稳的办法是「自托管」：
+ * 把你自己的音频文件放进 public/music/，再跑 `npm run music` 生成清单。
  */
 export const MUSIC = {
-  server: 'netease',
+  /** 在线音源：tencent = QQ音乐，netease = 网易云 */
+  server: 'tencent',
   type: 'playlist',
-  id: '3778678',
+  /**
+   * 歌单 id。换成你自己的：
+   * QQ音乐网页版打开歌单，地址栏 `id=` 后面那串数字（歌单要设为公开）。
+   */
+  id: '7011264340',
+  /**
+   * Meting 接口，按顺序尝试。2026-09 实测：
+   *   moeyao 最快最稳 · injahow 时好时坏 · i-meto 基本已挂（留作最后兜底）
+   */
   apis: [
-    'https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r',
-    'https://api.injahow.cn/meting/?server=:server&type=:type&id=:id',
     'https://api.moeyao.cn/meting/?server=:server&type=:type&id=:id',
+    'https://api.injahow.cn/meting/?server=:server&type=:type&id=:id',
+    'https://api.i-meto.com/meting/api?server=:server&type=:type&id=:id&r=:r',
   ],
   /** 默认音量 0~1，会记住用户上次调的 */
   volume: 0.7,
-  /** 歌单加载失败时的兜底曲目（本地直链，永远能播） */
+
+  /* ---------- 自托管曲库（优先级最高，100% 完整可播） ---------- */
+  /** 曲库清单路径（相对 public 根）。放好歌后跑 `npm run music` 自动生成 */
+  localManifest: 'music/manifest.json',
+  /** 音频文件所在目录（相对 public 根） */
+  localDir: 'music',
+
+  /** 在线歌单都拿不到时的兜底曲目（永远能播） */
   localPlaylist: [
     {
       name: 'SoundHelix Song 1',

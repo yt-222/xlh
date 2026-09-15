@@ -11,6 +11,8 @@
     "check": "astro check",
     "images": "node build-images.mjs",
     "images:dry": "node build-images.mjs --dry-run",
+    "music": "node build-music.mjs",
+    "music:dry": "node build-music.mjs --dry-run",
     "astro": "astro"
   },
   "dependencies": {
