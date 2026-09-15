@@ -21,6 +21,11 @@
  * 封面与歌词（放在 music/ 目录里即可，脚本自动配对）：
  *   封面：<同名>.jpg/.png/.webp  →  其次 cover.jpg / folder.jpg（整张专辑共用）
  *   歌词：<同名>.lrc             →  其次 music/lyrics/<同名>.lrc
+ *
+ * ⚠ 加密下载格式放进来没用，脚本会认出来并提醒你：
+ *   QQ音乐 .mgg / .mflac / .mmp4、网易云 .ncm、酷狗 .kgm / .kgma 等，
+ *   都带版权锁、只有对应客户端能解，**改后缀名无效**。
+ *   需要先解密转成 mp3 / flac / ogg / m4a 再放进来。仅限个人自用，别传播。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -173,16 +178,42 @@ if (!fs.existsSync(MUSIC_DIR)) {
 }
 
 const entries = fs.readdirSync(MUSIC_DIR, { withFileTypes: true });
+/* 各平台的「加密下载」格式：文件本身是加了版权锁的，只有对应客户端能解，改后缀无效。
+   识别出来是为了给一句明确提示，而不是让它们被静默忽略。 */
+const LOCKED_EXT = [
+  '.mgg', '.mgg1', '.mggl', '.mflac', '.mmp4', // QQ 音乐
+  '.ncm', // 网易云
+  '.kgm', '.kgma', // 酷狗
+  '.qmc0', '.qmc2', '.qmc3', '.qmcflac', '.qmcogg', // 旧版 QMC 系列
+  '.tm0', '.tm2', '.tkm', // 版权限制内容
+];
+const lockedFiles = entries
+  .filter((e) => e.isFile() && LOCKED_EXT.includes(path.extname(e.name).toLowerCase()))
+  .map((e) => e.name)
+  .sort((a, b) => a.localeCompare(b, 'zh-CN'));
+
 const audioFiles = entries
   .filter((e) => e.isFile() && AUDIO_EXT.includes(path.extname(e.name).toLowerCase()))
   .map((e) => e.name)
   .sort((a, b) => a.localeCompare(b, 'zh-CN'));
 
+/* 加密下载格式的提示（两个分支都要说，别让用户以为脚本坏了） */
+function warnLocked() {
+  if (!lockedFiles.length) return;
+  console.log('\n  ⚠ 发现 ' + lockedFiles.length + ' 个「加密下载」文件，脚本无法处理：');
+  lockedFiles.slice(0, 5).forEach((f) => console.log('      ' + f));
+  if (lockedFiles.length > 5) console.log('      …还有 ' + (lockedFiles.length - 5) + ' 个');
+  console.log('    这类文件（.mgg/.mflac/.mmp4/.ncm/.kgm…）带版权锁，只有对应客户端能解，');
+  console.log('    改后缀名无效。先用工具解密转成 mp3/flac/ogg/m4a 再放进来，才会被收录。');
+  console.log('    仅限个人自用，不要传播。\n');
+}
+
 if (!audioFiles.length) {
-  console.log('\n  public/music/ 里还没有音频文件。\n');
-  console.log('  把你想在站内完整播放的歌复制进来（mp3 / m4a / flac / wav 都行），');
+  console.log('\n  public/music/ 里还没有可用的音频文件。\n');
+  console.log('  把你想在站内完整播放的歌复制进来（mp3 / m4a / flac / wav / ogg 都行），');
   console.log('  再跑一次 `npm run music` 就会生成清单。');
-  console.log('  文件名建议写成「歌手 - 歌名.mp3」，脚本会自动拆开填进播放器。\n');
+  console.log('  文件名建议写成「歌手 - 歌名.mp3」，脚本会自动拆开填进播放器。');
+  warnLocked();
   if (!DRY && !fs.existsSync(MANIFEST)) {
     // 写一个空清单占位，免得播放器控制台一直报 404
     fs.writeFileSync(
@@ -193,6 +224,7 @@ if (!audioFiles.length) {
   }
   process.exit(0);
 }
+warnLocked();
 
 /* 手动信息表：{ "文件名.mp3": { name, artist, album, cover, lrc } } */
 let meta = {};

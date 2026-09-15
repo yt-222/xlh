@@ -14,6 +14,10 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MUSIC = path.join(HERE, 'public', 'music');
+const MANIFEST = path.join(MUSIC, 'manifest.json');
+/* 记下跑测试前的清单内容，跑完原样还原 ——
+   否则每次自测都会写进新的 generatedAt，把 git 工作树弄脏。 */
+const prevManifest = fs.existsSync(MANIFEST) ? fs.readFileSync(MANIFEST, 'utf8') : null;
 
 /* ---------- 构造 ID3v2.3 标签 ---------- */
 function utf16leFrame(id, text) {
@@ -96,6 +100,11 @@ const t2 = 'Nobody - No Tags Here.mp3';
 fs.writeFileSync(path.join(MUSIC, t2), Buffer.concat([Buffer.from([0xff, 0xfb, 0x90, 0x00]), filler]));
 made.push(t2);
 
+/* ③ 平台加密下载格式：不该进清单，但必须给出明确提示（不能静默忽略） */
+const t3 = '测试加密曲.mgg';
+fs.writeFileSync(path.join(MUSIC, t3), Buffer.from('MGG-DUMMY-NOT-REAL-AUDIO'));
+made.push(t3);
+
 console.log('=== 造好测试文件，开始跑 build-music.mjs ===\n');
 let out = '';
 try {
@@ -121,6 +130,8 @@ const results = [
   ['歌词配对成功', byName[t1] && byName[t1].lrc === '测试歌手 - 测试歌名.lrc'],
   ['无标签文件用文件名拆分歌手', byName[t2] && byName[t2].artist === 'Nobody'],
   ['无标签文件用文件名拆分歌名', byName[t2] && byName[t2].name === 'No Tags Here'],
+  ['加密格式文件不进清单', !manifest.tracks.some((t) => t.file === t3)],
+  ['加密格式有明确提示（点名到文件）', out.includes('加密下载') && out.includes(t3)],
 ];
 
 console.log('\n=== 自测结果 ===');
@@ -140,10 +151,9 @@ if (fs.existsSync(covDir)) {
   for (const f of fs.readdirSync(covDir)) fs.unlinkSync(path.join(covDir, f));
   fs.rmdirSync(covDir);
 }
-fs.writeFileSync(
-  path.join(MUSIC, 'manifest.json'),
-  JSON.stringify({ generatedAt: new Date().toISOString(), count: 0, tracks: [] }, null, 2)
-);
-console.log('\n  测试文件已清理，manifest 已重置为空清单');
+/* 还原跑测试前的清单（连字节都要一致，别留下时间戳差异） */
+if (prevManifest !== null) fs.writeFileSync(MANIFEST, prevManifest);
+else fs.rmSync(MANIFEST, { force: true });
+console.log('\n  测试文件已清理，manifest 已还原为测试前的内容');
 console.log(`\n${results.length - bad}/${results.length} 通过`);
 process.exit(bad ? 1 : 0);
