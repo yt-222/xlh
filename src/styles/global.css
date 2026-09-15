@@ -54,7 +54,13 @@
   --font-pixel: 'Pixelify Sans', var(--font-body);
   --font-mono: 'JetBrains Mono', 'Consolas', monospace;
 
-  --content-width: 1180px;
+  /* 三栏需要更宽的画布：减去左右两栏与两个间隙之后，
+     正文区还得放得下两列文章卡片。原先的 1180 塞三栏会很挤。 */
+  --content-width: 1330px;
+
+  /* 三栏的轨道宽度（左：身份与导览 / 右：工具与状态） */
+  --rail-left: 236px;
+  --rail-right: 276px;
 
   /* ---------- 1.1 层级背景（玻璃拟态三层） ---------- */
   --web: rgba(6, 18, 35, 0.88);
@@ -854,12 +860,25 @@ html.day-theme .theme-toggle-btn .icon-moon {
   }
 }
 
-/* ---------- 7. 两栏布局（正文 + 侧边栏） ---------- */
+/* ---------- 7. 三栏布局（左栏 + 正文 + 右栏） ----------
+ * 参考 Firefly 的双侧边栏：左栏回答「你是谁、我能去哪」，右栏回答「现在怎样、你会什么」，
+ * 中间留给内容本身。
+ * 三栏最难的是「窄屏时谁先让位」——
+ *   左栏是身份展示，第一眼看到就够了；右栏是持续有用的信息，滚动中随时想瞄一眼。
+ *   所以中等屏幕先收左栏、保留右栏，再窄才整体落到内容下方。
+ */
 .layout-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 32px;
+  grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
+  gap: 24px;
   align-items: start;
+}
+
+/* 桌面三栏靠 DOM 顺序自动落位：左栏 → 正文 → 右栏，正好对应网格三列。
+   千万别在这里写 order —— 网格的自动放置会按 order 排序，
+   一旦正文的 order 大于侧栏，正文和右栏的列位置就会整块对调。 */
+.layout-main > main {
+  min-width: 0;
 }
 
 .section-heading {
@@ -885,15 +904,23 @@ html.day-theme .theme-toggle-btn .icon-moon {
   color: var(--muted);
 }
 
-/* ---------- 8. 文章卡片 ---------- */
+/* ---------- 8. 文章卡片 ----------
+ * 网格化：不写死列数，交给 auto-fill + 最小列宽自己算。
+ * 好处是三栏下正好两列、窄屏自动降一列，不必为每个断点手写一遍。
+ */
 .post-list {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  /* min(320px, 100%) 是给窄容器兜底：容器一旦比 320px 还窄，
+     列宽退回 100%，否则卡片会硬撑着顶出容器（手机上就是横向滚动条）。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
   gap: 18px;
 }
 
 .post-card {
-  display: block;
+  /* flex 而非 block：网格里同一行的卡片会被拉成等高，
+     靠 flex 才能把底部的标签栏压到卡片下沿，几行摘要都对齐。 */
+  display: flex;
+  flex-direction: column;
   position: relative;
   padding: 24px 26px;
   border-radius: var(--radius-md);
@@ -901,10 +928,103 @@ html.day-theme .theme-toggle-btn .icon-moon {
   background: var(--card-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  /* 封面用负 margin 贴到卡片内边缘，得靠它裁掉溢出部分 */
+  overflow: hidden;
   transition:
     transform 0.35s cubic-bezier(0.34, 1.4, 0.64, 1),
     border-color 0.3s ease,
     background 0.3s ease;
+}
+
+/* ---- 卡片顶部 ----
+ * 有 cover 就放图；没有就放一块「引力轨道」装饰板 ——
+ * 让每张卡片都有头有尾，又不必为了好看硬给文章配一张不相干的图。
+ * 配色按 nth-child 轮换：蓝 / 天蓝 / 阳光黄 / 珊瑚粉（全站不用大面积紫）。 */
+.post-card-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  margin: -24px -26px 18px;
+  overflow: hidden;
+  background: var(--card-bg-hover);
+}
+.post-card-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.6s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+.post-card:hover .post-card-cover img {
+  transform: scale(1.045);
+}
+
+.post-card-cover.deco {
+  background:
+    radial-gradient(120% 150% at 84% 4%, var(--deco-glow) 0%, transparent 62%),
+    linear-gradient(150deg, var(--deco-base), transparent 72%),
+    var(--card-bg-hover);
+}
+/* 虚线外轨 + 实线内轨 + 轨道上的一颗光点 */
+.post-card-cover.deco::before,
+.post-card-cover.deco::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  border-radius: 50%;
+}
+.post-card-cover.deco::before {
+  width: 148px;
+  height: 148px;
+  margin: -74px 0 0 -74px;
+  border: 1px dashed var(--border-ac);
+  transition: transform 0.8s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+.post-card-cover.deco::after {
+  width: 118px;
+  height: 118px;
+  margin: -59px 0 0 -59px;
+  border: 1px solid var(--deco-line);
+}
+.post-card-cover.deco .deco-dot {
+  position: absolute;
+  left: 50%;
+  top: 56%;
+  width: 7px;
+  height: 7px;
+  margin: -78px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--deco-dot);
+  box-shadow: 0 0 12px var(--deco-dot);
+}
+/* 悬停时外轨轻转一点，像被拨动 */
+.post-card:hover .post-card-cover.deco::before {
+  transform: rotate(24deg);
+}
+
+.post-list .post-card:nth-child(4n + 1) .post-card-cover.deco {
+  --deco-glow: var(--halo-blue);
+  --deco-base: var(--halo-blue);
+  --deco-line: rgba(59, 130, 246, 0.22);
+  --deco-dot: var(--blue);
+}
+.post-list .post-card:nth-child(4n + 2) .post-card-cover.deco {
+  --deco-glow: var(--halo-sky);
+  --deco-base: var(--halo-sky);
+  --deco-line: rgba(56, 189, 248, 0.22);
+  --deco-dot: var(--sky);
+}
+.post-list .post-card:nth-child(4n + 3) .post-card-cover.deco {
+  --deco-glow: var(--halo-sun);
+  --deco-base: var(--halo-sun);
+  --deco-line: rgba(251, 191, 36, 0.24);
+  --deco-dot: var(--sun);
+}
+.post-list .post-card:nth-child(4n + 4) .post-card-cover.deco {
+  --deco-glow: var(--halo-coral);
+  --deco-base: var(--halo-coral);
+  --deco-line: rgba(251, 113, 133, 0.24);
+  --deco-dot: var(--coral);
 }
 
 .post-card:hover {
@@ -968,6 +1088,11 @@ html.day-theme .theme-toggle-btn .icon-moon {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+/* 卡片等高时把标签栏压到底部，摘要长度不同也能对齐 */
+.post-card .post-meta {
+  margin-top: auto;
+  padding-top: 2px;
 }
 
 .chip {
@@ -1991,14 +2116,47 @@ html.day-theme .theme-toggle-btn .icon-moon {
 }
 
 /* ---------- 17. 响应式 ---------- */
-@media (max-width: 980px) {
+/* 三栏 → 两栏：先请左栏退场。
+   身份信息扫一眼就够，右栏的工具（天气/日历/进度）才是滚动中常看常新的，所以留右不留在。 */
+@media (max-width: 1239px) {
+  .layout-main {
+    grid-template-columns: minmax(0, 1fr) var(--rail-right);
+  }
+  .sidebar-left {
+    display: none;
+  }
+}
+
+/* 两栏 → 单栏：侧边栏整体落到内容下方，卡片横向摊开以省高度 */
+@media (max-width: 1000px) {
   .layout-main {
     grid-template-columns: minmax(0, 1fr);
   }
+  /* 单列后要显式换序：正文 → 左栏 → 右栏（DOM 里左栏本来排在正文之前） */
+  .layout-main > main {
+    order: 1;
+  }
   .sidebar {
     position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .sidebar > * {
+    flex: 1 1 280px;
+    min-width: 0;
+  }
+  /* 单栏时左栏重新出现 —— 否则窄屏连名片、分类、标签都看不到。
+     顺序：正文 → 左栏（身份与导览）→ 右栏（工具与状态） */
+  .sidebar-left {
+    display: flex;
     order: 2;
   }
+  .sidebar-right {
+    order: 3;
+  }
+}
+
+@media (max-width: 980px) {
   .about-grid {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -1,8 +1,14 @@
 ---
 /**
- * 首页侧边栏
- * 顺序：小工具在前（天气、写作轨迹），然后是身份名片、
- * 公告、分类、标签，最后是技能 / 此刻正在 / 联系方式。
+ * 侧边栏（支持左右分区）
+ *
+ * 三栏布局下按 side 渲染成两列，参考 Firefly 的双侧边栏思路。
+ * 这么分不是为了左右对称，而是让两种性质的卡片各归其位：
+ *
+ *   side="left"   身份与导览 —— 名片、公告、分类、标签、联系方式
+ *                 「你是谁、我能去哪」：进来扫一眼就够，不需要一直盯着
+ *   side="right"  工具与状态 —— 天气、写作轨迹、技能、此刻正在
+ *                 「现在怎样、你会什么」：滚动中随时会想瞄一眼
  *
  * 每块都挂了 data-spotlight —— 鼠标划过时有一团柔光跟着走。
  */
@@ -19,13 +25,15 @@ interface PostLite {
 }
 
 interface Props {
+  /** 渲染成哪一侧；不传按右栏处理 */
+  side?: 'left' | 'right';
   postCount: number;
   categories: { name: string; count: number }[];
   tags: { name: string; count: number }[];
   posts: PostLite[];
 }
 
-const { postCount, categories, tags, posts } = Astro.props;
+const { side = 'right', postCount, categories, tags, posts } = Astro.props;
 
 const ICONS: Record<string, string> = {
   github:
@@ -38,125 +46,127 @@ const ICONS: Record<string, string> = {
 };
 ---
 
-<div class="sidebar">
-  <!-- 天气卡（江夏实时） -->
-  <WeatherCard />
-
-  <!-- 写作轨迹（日历热力图） -->
-  <CalendarHeatmap posts={posts} />
-
-  <!-- 身份名片 -->
-  <div class="sidebar-block profile-card" data-spotlight data-animate>
-    <div class="profile-avatar">
-      <span class="profile-avatar-ring" aria-hidden="true"></span>
-      <span class="profile-avatar-text">{SITE.avatarText}</span>
-    </div>
-    <div class="profile-name">{SITE.author}</div>
-    <div class="profile-role">{SITE.role}</div>
-
-    <div class="stats-grid">
-      <div class="stat-item">
-        <div class="stat-number" data-count={postCount}>{postCount}</div>
-        <div class="stat-label">POSTS</div>
-      </div>
-      <div class="stat-item">
-        <div class="stat-number" data-count={tags.length}>{tags.length}</div>
-        <div class="stat-label">TAGS</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 公告（config 里没写就自动隐藏） -->
-  <AnnounceBox />
-
-  <!-- 分类 -->
+<div class:list={['sidebar', `sidebar-${side}`]}>
   {
-    categories.length > 0 && (
-      <div class="sidebar-block" data-spotlight>
-        <h3 class="sidebar-title">分类</h3>
-        <div class="cat-list">
-          {categories.map((c) => (
-            <a href={withBase(`/tags/${encodeURIComponent(c.name)}/`)} class="cat-item">
-              <span>{c.name}</span>
-              <span class="count">{c.count}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  <!-- 标签云 -->
-  {
-    tags.length > 0 && (
-      <div class="sidebar-block" data-spotlight>
-        <h3 class="sidebar-title">标签</h3>
-        <div class="tag-cloud">
-          {tags.slice(0, 24).map((t) => (
-            <a href={withBase(`/tags/${encodeURIComponent(t.name)}/`)} class="chip">
-              #{t.name}
-            </a>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  <!-- 技能 -->
-  <div class="sidebar-block" data-spotlight>
-    <h3 class="sidebar-title">技能</h3>
-    <div class="skills-grid">
-      {
-        SKILLS.map((s) => (
-          <div class="skill-item">
-            <div class="skill-icon">{s.icon}</div>
-            <div class="skill-name">{s.name}</div>
-            <div class="skill-level">{s.level}</div>
+    side === 'left' ? (
+      <>
+        {/* 身份名片 */}
+        <div class="sidebar-block profile-card" data-spotlight data-animate>
+          <div class="profile-avatar">
+            <span class="profile-avatar-ring" aria-hidden="true" />
+            <span class="profile-avatar-text">{SITE.avatarText}</span>
           </div>
-        ))
-      }
-    </div>
-  </div>
+          <div class="profile-name">{SITE.author}</div>
+          <div class="profile-role">{SITE.role}</div>
 
-  <!-- 此刻正在 -->
-  <div class="sidebar-block" data-spotlight>
-    <h3 class="sidebar-title">此刻正在...</h3>
-    <div class="now-items">
-      {
-        NOW_ITEMS.map((item) => (
-          <div class="now-item">
-            <span class:list={['now-dot', item.dot]} />
-            {item.text}
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-number" data-count={postCount}>
+                {postCount}
+              </div>
+              <div class="stat-label">POSTS</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-number" data-count={tags.length}>
+                {tags.length}
+              </div>
+              <div class="stat-label">TAGS</div>
+            </div>
           </div>
-        ))
-      }
-    </div>
-  </div>
-
-  <!-- 联系方式（href 留空的项自动隐藏） -->
-  {
-    ACTIVE_SOCIAL_LINKS.length > 0 && (
-      <div class="sidebar-block" data-spotlight>
-        <h3 class="sidebar-title">找到我</h3>
-        <div class="about-contact">
-          {ACTIVE_SOCIAL_LINKS.map((s) => (
-            <a href={s.href} target="_blank" rel="noopener" title={s.name} aria-label={s.name}>
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                set:html={(ICONS[s.icon] || '')
-                  .split('|')
-                  .map((d) => `<path d="${d}" />`)
-                  .join('')}
-              />
-            </a>
-          ))}
         </div>
-      </div>
+
+        {/* 公告（config 里没写就自动隐藏） */}
+        <AnnounceBox />
+
+        {/* 分类 */}
+        {categories.length > 0 && (
+          <div class="sidebar-block" data-spotlight>
+            <h3 class="sidebar-title">分类</h3>
+            <div class="cat-list">
+              {categories.map((c) => (
+                <a href={withBase(`/tags/${encodeURIComponent(c.name)}/`)} class="cat-item">
+                  <span>{c.name}</span>
+                  <span class="count">{c.count}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 标签云 */}
+        {tags.length > 0 && (
+          <div class="sidebar-block" data-spotlight>
+            <h3 class="sidebar-title">标签</h3>
+            <div class="tag-cloud">
+              {tags.slice(0, 24).map((t) => (
+                <a href={withBase(`/tags/${encodeURIComponent(t.name)}/`)} class="chip">
+                  #{t.name}
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 联系方式（href 留空的项自动隐藏） */}
+        {ACTIVE_SOCIAL_LINKS.length > 0 && (
+          <div class="sidebar-block" data-spotlight>
+            <h3 class="sidebar-title">找到我</h3>
+            <div class="about-contact">
+              {ACTIVE_SOCIAL_LINKS.map((s) => (
+                <a href={s.href} target="_blank" rel="noopener" title={s.name} aria-label={s.name}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    set:html={(ICONS[s.icon] || '')
+                      .split('|')
+                      .map((d) => `<path d="${d}" />`)
+                      .join('')}
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+      </>
+    ) : (
+      <>
+        {/* 天气卡（江夏实时） */}
+        <WeatherCard />
+
+        {/* 写作轨迹（日历热力图） */}
+        <CalendarHeatmap posts={posts} />
+
+        {/* 技能 */}
+        <div class="sidebar-block" data-spotlight>
+          <h3 class="sidebar-title">技能</h3>
+          <div class="skills-grid">
+            {SKILLS.map((s) => (
+              <div class="skill-item">
+                <div class="skill-icon">{s.icon}</div>
+                <div class="skill-name">{s.name}</div>
+                <div class="skill-level">{s.level}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 此刻正在 */}
+        <div class="sidebar-block" data-spotlight>
+          <h3 class="sidebar-title">此刻正在...</h3>
+          <div class="now-items">
+            {NOW_ITEMS.map((item) => (
+              <div class="now-item">
+                <span class:list={['now-dot', item.dot]} />
+                {item.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      </>
     )
   }
 </div>

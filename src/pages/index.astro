@@ -58,6 +58,15 @@ const iconSvg = (key: string) =>
         }
 
         <div class="layout-main">
+          {/* 左栏：身份与导览 */}
+          <Sidebar
+            side="left"
+            postCount={posts.length}
+            categories={categories}
+            tags={tags}
+            posts={posts}
+          />
+
           <main>
             <h2 class="section-heading">
               最新文章 <span class="count">/{String(recent.length).padStart(2, '0')}</span>
@@ -88,7 +97,14 @@ const iconSvg = (key: string) =>
             }
           </main>
 
-          <Sidebar postCount={posts.length} categories={categories} tags={tags} posts={posts} />
+          {/* 右栏：工具与状态 */}
+          <Sidebar
+            side="right"
+            postCount={posts.length}
+            categories={categories}
+            tags={tags}
+            posts={posts}
+          />
         </div>
 
         <Footer />

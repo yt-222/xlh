@@ -1,4 +1,13 @@
 ---
+/**
+ * 文章卡片
+ *
+ * 顶部一块封面区：
+ *   文章 frontmatter 写了 cover 就用真图；
+ *   没写就渲染一块「引力轨道」装饰板 —— 呼应全站的轨道母题，
+ *   也让每张卡片都有头有尾，不必为了好看硬塞一张不相干的配图。
+ *   装饰板的配色由 CSS 按 nth-child 轮换（见 global.css 第 8 节）。
+ */
 import type { PostItem } from '@/utils/posts';
 import { withBase } from '@/utils/url';
 
@@ -7,6 +16,7 @@ interface Props {
 }
 
 const { post } = Astro.props;
+const cover = post.cover?.trim();
 ---
 
 <a
@@ -15,6 +25,18 @@ const { post } = Astro.props;
   data-animate
   data-spotlight
 >
+  {
+    cover ? (
+      <div class="post-card-cover">
+        <img src={withBase(cover)} alt="" loading="lazy" decoding="async" />
+      </div>
+    ) : (
+      <div class="post-card-cover deco" aria-hidden="true">
+        <span class="deco-dot" />
+      </div>
+    )
+  }
+
   <div class="post-card-head">
     <span class="post-date">{post.dateText}</span>
     {post.pinned && <span class="post-badge pinned">置顶</span>}
