@@ -1,0 +1,133 @@
+---
+/**
+ * 每日一言 —— 首页右栏顶部那张卡片
+ *
+ * 核心难点：这是纯静态站，构建时算出的「今天」会被冻进 HTML。
+ * 如果只在构建时取句，那篇文章不重新部署，卡片就会一直显示部署那天的句子，
+ * 「每天更新」就是假的。
+ *
+ * 所以做成两层：
+ *   1) 服务端按**构建当天**渲染一句 —— 无 JS、爬虫、首屏都能立刻看到内容，不会空白；
+ *   2) 浏览器加载后按**访问当天**重算一次。日期没变就不动 DOM，变了才替换，
+ *      所以正常情况下用户看不到任何闪动。
+ *
+ * 两侧共用 src/utils/daily.ts 里的同一套算法（按「天序号」取模），
+ * 保证不会出现「服务端说 A、客户端说 B」的跳字。
+ */
+import { QUOTES } from '@/data/quotes';
+import { dailyIndex, dateKey, shortDate } from '@/utils/daily';
+
+const buildDate = new Date();
+const quote = QUOTES[dailyIndex(buildDate)];
+
+/** 整库塞进 data 属性，供浏览器端「换一句」和跨天校正使用（约 2KB） */
+const quotesPayload = QUOTES.map((q) => ({ t: q.text, f: q.from ?? '' }));
+---
+
+<div
+  class="widget-card quote-card"
+  data-spotlight
+  data-quote-card
+  data-build-key={dateKey(buildDate)}
+  data-quotes={JSON.stringify(quotesPayload)}
+>
+  <div class="quote-head">
+    <h3 class="sidebar-title">每日一言</h3>
+    <span class="quote-date" data-quote-date>{shortDate(buildDate)}</span>
+  </div>
+
+  <blockquote class="quote-body">
+    <span class="quote-spark" aria-hidden="true">❝</span>
+    <p class="quote-text" data-quote-text>{quote.text}</p>
+    <cite class="quote-author" data-quote-author>{quote.from ? `—— ${quote.from}` : ''}</cite>
+  </blockquote>
+
+  <div class="quote-foot">
+    <span class="quote-index" data-quote-index></span>
+    <button class="quote-next" type="button" data-quote-next title="换一句（只影响本次浏览）">
+      换一句
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-2.6-6.4" />
+        <path d="M21 3v6h-6" />
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script is:inline data-astro-rerun>
+  /* 同 WeatherCard：必须 `is:inline`（否则被打包成外部 module、跳页不再执行）
+     + `data-astro-rerun`（否则相同内容的内联脚本第二次出现会被 ClientRouter 跳过）。
+     这里不引任何模块，全部数据从 data-quotes 读，所以写成纯 JS。 */
+  (function () {
+    function localKey(d) {
+      return (
+        d.getFullYear() +
+        '-' +
+        String(d.getMonth() + 1).padStart(2, '0') +
+        '-' +
+        String(d.getDate()).padStart(2, '0')
+      );
+    }
+    /* 与服务端 utils/daily.ts 完全一致：按天序号取模，保证每天必然不同 */
+    function dayNumber(d) {
+      return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+    }
+    function mod(n, len) {
+      return ((n % len) + len) % len;
+    }
+
+    var cards = document.querySelectorAll('[data-quote-card]');
+    if (!cards.length) return;
+
+    var today = new Date();
+    var todayKey = localKey(today);
+
+    cards.forEach(function (card) {
+      var quotes = [];
+      try {
+        quotes = JSON.parse(card.dataset.quotes || '[]');
+      } catch (e) {
+        quotes = [];
+      }
+      if (!quotes.length) return;
+
+      var len = quotes.length;
+      var base = mod(dayNumber(today), len);
+      /* 点「换一句」每次往前跳 7 句：7 与库长度互质，能轮遍全部句子，
+         而且第一次点必然不是当前这句 */
+      var offset = 0;
+
+      var textEl = card.querySelector('[data-quote-text]');
+      var authorEl = card.querySelector('[data-quote-author]');
+      var dateEl = card.querySelector('[data-quote-date]');
+      var indexEl = card.querySelector('[data-quote-index]');
+      var nextBtn = card.querySelector('[data-quote-next]');
+
+      function render(i) {
+        var q = quotes[mod(i, len)];
+        if (textEl) textEl.textContent = q.t;
+        if (authorEl) authorEl.textContent = q.f ? '—— ' + q.f : '';
+        if (indexEl) indexEl.textContent = '第 ' + (mod(i, len) + 1) + ' / ' + len + ' 句';
+        /* 顺手把这句暴露出去：看板娘的气泡会优先说它（她加载得比这里晚得多，
+           所以读得到）。两处都用同一个值，人物说的话和卡片上的就是同一句。 */
+        window.__cabinDailyQuote = q.f ? q.t + '　—— ' + q.f : q.t;
+      }
+
+      /* 构建日期和今天不一致 → 说明 HTML 是旧的，按今天重算 */
+      if (card.dataset.buildKey !== todayKey) {
+        render(base);
+        if (dateEl) dateEl.textContent = today.getMonth() + 1 + ' 月 ' + today.getDate() + ' 日';
+      } else {
+        render(base);
+      }
+
+      if (nextBtn) {
+        nextBtn.addEventListener('click', function () {
+          offset += 7;
+          render(base + offset);
+        });
+      }
+    });
+  })();
+</script>

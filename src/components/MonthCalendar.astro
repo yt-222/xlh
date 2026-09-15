@@ -1,0 +1,229 @@
+---
+/**
+ * 月历卡片 —— 右侧栏
+ *
+ * 和上面那张「写作轨迹」热力图的分工：
+ *   热力图 = 半年尺度的密度趋势（一眼看出哪段时间在写东西）
+ *   月历   = 当月尺度的具体日子（今天几号、哪天发过文章）
+ * 两者互补，所以放在一起。
+ *
+ * 实现要点和「每日一言」一样是「构建期会冻结」：服务端按构建当天渲染当月，
+ * 浏览器加载后按访问当天校正（月份不同就重画），翻月按钮纯客户端。
+ */
+import { withBase } from '@/utils/url';
+
+interface PostLite {
+  id: string;
+  title: string;
+  date: Date;
+}
+
+interface Props {
+  posts: PostLite[];
+}
+
+const { posts } = Astro.props;
+
+/** 归一到本地时区的 YYYY-MM-DD */
+const key = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+/** 日期 → 当天发布的文章标题（用作鼠标悬浮提示） */
+const postMap: Record<string, string[]> = {};
+for (const p of posts) {
+  const k = key(new Date(p.date));
+  (postMap[k] ||= []).push(p.title);
+}
+
+const today = new Date();
+const buildKey = key(today);
+
+/**
+ * 生成某个月的日历格子。
+ * 周日起排（对应表头的 日一二三四五六），前后补空格子凑满整周。
+ */
+function cells(target: Date, todayKey: string) {
+  const y = target.getFullYear();
+  const m = target.getMonth();
+  const firstPad = new Date(y, m, 1).getDay();
+  const daysIn = new Date(y, m + 1, 0).getDate();
+  const total = Math.ceil((firstPad + daysIn) / 7) * 7;
+  const out: { day: number | null; key: string; isToday: boolean; count: number; titles: string[]; future: boolean }[] = [];
+  for (let i = 0; i < total; i++) {
+    const day = i - firstPad + 1;
+    if (day < 1 || day > daysIn) {
+      out.push({ day: null, key: '', isToday: false, count: 0, titles: [], future: false });
+      continue;
+    }
+    const k = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const titles = postMap[k] ?? [];
+    out.push({
+      day,
+      key: k,
+      isToday: k === todayKey,
+      count: titles.length,
+      titles,
+      future: k > todayKey,
+    });
+  }
+  return out;
+}
+
+const buildCells = cells(today, buildKey);
+const monthLabel = `${today.getFullYear()} 年 ${today.getMonth() + 1} 月`;
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+/** 当月发布的篇数（只统计当月，用于底部小字） */
+const monthPrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-`;
+const monthCount = Object.keys(postMap)
+  .filter((k) => k.startsWith(monthPrefix))
+  .reduce((a, k) => a + postMap[k].length, 0);
+
+const archiveHref = withBase('/archive/');
+---
+
+<div
+  class="widget-card month-cal"
+  data-spotlight
+  data-month-cal
+  data-post-map={JSON.stringify(postMap)}
+  data-build-key={buildKey}
+>
+  <div class="calendar-header">
+    <h3 class="sidebar-title">日历</h3>
+    <span class="cal-range" data-cal-month>{monthLabel}</span>
+  </div>
+
+  <div class="mc-nav">
+    <button class="mc-btn" type="button" data-cal-prev aria-label="上一个月" title="上一个月">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+    </button>
+    <button class="mc-today" type="button" data-cal-today title="回到本月">今天</button>
+    <button class="mc-btn" type="button" data-cal-next aria-label="下一个月" title="下一个月">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+    </button>
+  </div>
+
+  <div class="mc-weekdays">
+    {WEEKDAYS.map((w) => <span>{w}</span>)}
+  </div>
+
+  <div class="mc-grid" data-cal-grid>
+    {
+      buildCells.map((c) =>
+        c.day === null ? (
+          <span class="mc-cell is-empty" />
+        ) : (
+          <span
+            class:list={[
+              'mc-cell',
+              { 'is-today': c.isToday, 'has-post': c.count > 0, 'is-future': c.future },
+            ]}
+            title={c.count > 0 ? `${c.key}　${c.titles.join(' / ')}` : c.key}
+          >
+            {c.day}
+          </span>
+        )
+      )
+    }
+  </div>
+
+  <div class="mc-foot">
+    <span data-cal-count>本月 {monthCount} 篇</span>
+    <a href={archiveHref} class="mc-more">全部归档 →</a>
+  </div>
+</div>
+
+<script is:inline data-astro-rerun>
+  /* 又是那两条硬规矩：`is:inline`（否则被打包成外部 module，跳页不重跑）
+     + `data-astro-rerun`（否则同内容内联脚本会被 ClientRouter 去重跳过）。
+     日历只在首页侧栏出现，但首页是会被反复进入的，所以照样要管。 */
+  (function () {
+    function pad2(n) {
+      return String(n).padStart(2, '0');
+    }
+    function keyOf(d) {
+      return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    }
+
+    var roots = document.querySelectorAll('[data-month-cal]');
+    if (!roots.length) return;
+
+    var today = new Date();
+    var todayKey = keyOf(today);
+
+    roots.forEach(function (root) {
+      var grid = root.querySelector('[data-cal-grid]');
+      var monthEl = root.querySelector('[data-cal-month]');
+      var countEl = root.querySelector('[data-cal-count]');
+      if (!grid) return;
+
+      var map = {};
+      try {
+        map = JSON.parse(root.dataset.postMap || '{}');
+      } catch (e) {
+        map = {};
+      }
+
+      /* 当前显示的月份。初值取「构建那天」，但如果 HTML 是旧的（跨月了），
+         下面会用访问当天覆盖，所以先记下来再校正。 */
+      var cur = new Date();
+
+      function render(target) {
+        var y = target.getFullYear();
+        var m = target.getMonth();
+        var firstPad = new Date(y, m, 1).getDay();
+        var daysIn = new Date(y, m + 1, 0).getDate();
+        var total = Math.ceil((firstPad + daysIn) / 7) * 7;
+
+        var html = '';
+        var monthCount = 0;
+        for (var i = 0; i < total; i++) {
+          var day = i - firstPad + 1;
+          if (day < 1 || day > daysIn) {
+            html += '<span class="mc-cell is-empty"></span>';
+            continue;
+          }
+          var k = y + '-' + pad2(m + 1) + '-' + pad2(day);
+          var titles = map[k] || [];
+          var cls = 'mc-cell';
+          if (k === todayKey) cls += ' is-today';
+          if (titles.length) cls += ' has-post';
+          if (k > todayKey) cls += ' is-future';
+          var title = titles.length ? k + '　' + titles.join(' / ') : k;
+          if (titles.length) monthCount += titles.length;
+          html +=
+            '<span class="' + cls + '" title="' + title + '">' + day + '</span>';
+        }
+        grid.innerHTML = html;
+
+        if (monthEl) monthEl.textContent = y + ' 年 ' + (m + 1) + ' 月';
+        if (countEl) countEl.textContent = '本月 ' + monthCount + ' 篇';
+      }
+
+      render(cur);
+
+      var prev = root.querySelector('[data-cal-prev]');
+      var next = root.querySelector('[data-cal-next]');
+      var reset = root.querySelector('[data-cal-today]');
+
+      if (prev)
+        prev.addEventListener('click', function () {
+          cur = new Date(cur.getFullYear(), cur.getMonth() - 1, 1);
+          render(cur);
+        });
+      if (next)
+        next.addEventListener('click', function () {
+          cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+          render(cur);
+        });
+      if (reset)
+        reset.addEventListener('click', function () {
+          cur = new Date();
+          render(cur);
+        });
+    });
+  })();
+</script>

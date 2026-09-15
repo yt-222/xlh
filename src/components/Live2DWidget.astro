@@ -1,0 +1,309 @@
+---
+/**
+ * Live2D 看板娘 —— 雪初音（snow_miku）
+ *
+ * 参考站（momonyako.ccwu.cc）用的是同一套东西。抄它之前先看了它的实现，有三点值得说：
+ *
+ * 1) **自托管，不用官方模型 CDN**。参考站自己也把库和模型放在站内。
+ *    原本想用「官方」的 model.oml2d.com，实测已经被赌博站劫持 ——
+ *    请求 /HK416-1-normal/model.json 返回的是「51吃瓜网」的 HTML 页面。
+ *    这类资源一旦被别人接管，轻则人物不显示、重则加载来一堆奇怪东西，所以必须自托管。
+ *
+ * 2) **挂进常驻层**。本组件被放在 Layout 的 `transition:persist` 容器里，
+ *    交上去的 DOM 连同 canvas 一起在站内跳转时原样保留 ——
+ *    换页面人物不会闪一下重来，也不会把 429KB 的贴图重新下一遍。
+ *    （`parentElement` 必须显式指向这块容器，否则库默认挂到 body，
+ *     而 body 里的东西是会被 ClientRouter 换掉的。）
+ *
+ * 3) **延迟加载**。库 979KB（传输约 267KB）、贴图 429KB，加起来不该跟首屏抢带宽。
+ *    所以等 window.load 之后再在空闲时段拉，且只在「明确」的省流/慢网/小屏信号下跳过。
+ *    ⚠️ 别再用 effectiveType 的 3g 档当门槛 —— 理由见脚本里那段长注释，
+ *    简单说就是它「还没测出网速」时默认就报 3g，会把所有首次访问的人误杀。
+ *
+ * 配置在 src/config.ts 的 LIVE2D 里。
+ */
+import { LIVE2D } from '@/config';
+import { withBase } from '@/utils/url';
+
+const cfg = LIVE2D;
+const libUrl = withBase('/' + cfg.libPath.replace(/^\//, ''));
+const modelUrl = withBase('/' + cfg.modelPath.replace(/^\//, ''));
+const rewardUrl = withBase('/reward/');
+const aboutUrl = withBase('/about/');
+
+/** 传给库的配置（放到 data 属性里，避免在 is:inline 脚本里写对象字面量） */
+const runtime = {
+  scale: cfg.scale,
+  position: [...cfg.position],
+  stage: cfg.stage,
+  stageBottom: cfg.stageBottom,
+  transitionTime: cfg.transitionTime,
+  mobileDisplay: cfg.mobileDisplay,
+  hideStatusBar: cfg.hideStatusBar,
+  welcome: cfg.welcome,
+  idleLines: [...cfg.idleLines],
+  primaryColor: '#38bdf8',
+  libUrl,
+  modelUrl,
+  rewardUrl,
+  aboutUrl,
+};
+---
+
+{
+  cfg.enable && (
+    <div
+      class="live2d-host"
+      id="cabin-live2d-host"
+      data-live2d-host
+      data-runtime={JSON.stringify(runtime)}
+      aria-hidden="true"
+    />
+  )
+}
+
+{
+  cfg.enable && (
+    <script is:inline data-astro-rerun>
+      /* 这段在常驻层里，本来跳页就不会重跑（元素被保留）；
+         但照样带 data-astro-rerun 兜底：万一有人把这个组件挪到常驻层外面，
+         也不至于出现「第一次能跑、跳页回来就没了」这种最难查的毛病。
+         window.__cabinLive2d 守卫保证无论重跑多少次都只初始化一次。 */
+      (function () {
+        if (window.__cabinLive2d) return;
+        var host = document.querySelector('[data-live2d-host]');
+        if (!host) return;
+        window.__cabinLive2d = true;
+
+        var cfg;
+        try {
+          cfg = JSON.parse(host.dataset.runtime || '{}');
+        } catch (e) {
+          return;
+        }
+
+        var conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection || {};
+
+        /* ---------- 该不该加载 ----------
+           这里踩过一个很深的坑，写下来免得以后又改回去。
+
+           原来在**解析阶段**就读 navigator.connection.effectiveType，
+           只要它报 2g 或 3g 就不加载。结果是：**第一次打开首页永远看不到人，
+           刷新一下就出来了**。查了半天，用 CDP 在页面脚本之前插桩，
+           把「守卫被读的那一刻」的值快照下来才看明白：
+
+             SNAPSHOT@flag eff=3g saveData=false rtt=400 downlink=0.4
+
+           effectiveType 不是「测出来的」，是 Chrome 的网络质量估算器
+           **基于已观测到的流量估算**出来的。标签页刚打开、还没传过任何
+           字节时它没有数据，于是给一份保守默认值 —— 恰好就是
+           rtt=400 / downlink=0.4 / effectiveType 报成 3g。
+           真跑起来几秒后才修正成 4g。
+
+           所以 3g 这一个档位完全没有参考价值：它既可能是真 3g，
+           也可能是「还不知道」。而 2g / slow-2g 只会在真的观测到很慢时
+           才出现（未知状态的默认值是 3g），拿来当门槛是安全的。
+
+           结论：只在**明确**信号下放弃加载 ——
+             · saveData：用户亲手开了省流开关
+             · prefers-reduced-data：系统级的省流量偏好
+             · 2g / slow-2g：确实慢到不该下
+           不拿 3g 当门槛。库 + 模型合计约 700KB，而且本来就推迟到
+           load 之后的空闲时段才拉，不会跟首屏抢带宽。 */
+
+        var CONN = conn;
+
+        /** 返回跳过原因；空字符串表示可以加载 */
+        function skipReason() {
+          try {
+            if (window.matchMedia('(prefers-reduced-data: reduce)').matches) return '系统省流量偏好';
+          } catch (e) {
+            /* 老浏览器没这个媒体查询，忽略 */
+          }
+          if (CONN.saveData) return '用户开了省流模式';
+          /* 注意只拦 2g / slow-2g，理由见上面那段 */
+          if (/^(slow-)?2g$/.test(CONN.effectiveType || '')) return '网络确实很慢';
+          if (!cfg.mobileDisplay && window.matchMedia('(max-width: 768px)').matches) return '小屏没地方放';
+          return '';
+        }
+
+        var booted = false;
+
+        function boot() {
+          if (booted || !window.OML2D) return;
+          booted = true;
+
+          var stageW = (cfg.stage && cfg.stage.width) || 300;
+          var stageH = (cfg.stage && cfg.stage.height) || 320;
+
+          try {
+            window.__cabinOml2d = window.OML2D.loadOml2d({
+              /* 挂进常驻层，而不是默认的 document.body */
+              parentElement: host,
+              dockedPosition: 'left',
+              mobileDisplay: false,
+              primaryColor: cfg.primaryColor,
+              transitionTime: cfg.transitionTime,
+              stageStyle: {
+                width: stageW,
+                height: stageH,
+                /* 抬高到音乐播放器上方：播放器固定在 left:20px / bottom:20px、占地 54×54，
+                   不抬的话人物正好压在它身上 */
+                bottom: (cfg.stageBottom || 76) + 'px',
+                left: '0px',
+                zIndex: 88,
+              },
+              models: [
+                {
+                  name: 'snow_miku',
+                  path: cfg.modelUrl,
+                  /* scale 与 position 是一对，必须同时调 —— 见 config.ts 里那段说明。
+                     position 是模型原点相对舞台左上角的偏移，scale 一变它就得重算。 */
+                  scale: cfg.scale || 0.0968,
+                  position: cfg.position || [0, 0],
+                  volume: 0,
+                },
+              ],
+              /* 库里那条竖排状态条（加载中/加载成功）默认只从屏幕左缘露一小截，
+                 看着像渲染残片，关掉。理由写在 config.ts 的 hideStatusBar 上。 */
+              statusBar: { disable: cfg.hideStatusBar !== false },
+              /* 气泡：优先说「今天这一句」，没有就随机说一句闲置台词 */
+              tips: {
+                messageLine: 4,
+                style: { fontSize: '13px', lineHeight: '1.7' },
+                welcomeTips: { duration: 8000, message: { morning: cfg.welcome } },
+                idleTips: {
+                  duration: 8000,
+                  interval: 26000,
+                  message: function () {
+                    var q = window.__cabinDailyQuote;
+                    if (q) return Promise.resolve('「' + q + '」');
+                    var lines = cfg.idleLines || [];
+                    if (!lines.length) return Promise.resolve('你好呀～');
+                    return Promise.resolve(lines[Math.floor(Math.random() * lines.length)]);
+                  },
+                },
+              },
+              /* 菜单图标只能用库自带的 svg sprite：#icon-rest / icon-about / icon-like
+                 / icon-skin / icon-setting / icon-switch / icon-loading，共 7 个。
+                 它不走 iconify 之类的在线图标库，所以没有额外网络依赖。 */
+              menus: {
+                items: [
+                  {
+                    id: 'reward',
+                    icon: 'icon-like',
+                    title: '请我喝一杯',
+                    onClick: function () {
+                      window.location.href = cfg.rewardUrl;
+                    },
+                  },
+                  {
+                    id: 'about',
+                    icon: 'icon-about',
+                    title: '关于我',
+                    onClick: function () {
+                      window.location.href = cfg.aboutUrl;
+                    },
+                  },
+                  {
+                    id: 'rest',
+                    icon: 'icon-rest',
+                    title: '让她下去休息',
+                    onClick: function (oml2d) {
+                      /* 用「整块淡出 + 屏蔽点击」，而不是库的 stageSlideOut：
+                         slideOut 会把菜单一起带走，人就再也叫不回来了。
+                         这里菜单同样淡出，回程入口交给体外的 .l2d-wake 按钮。
+                         注意只能改 opacity —— 在祖先上加 transform / filter 会让
+                         里面 position:fixed 的舞台失去视口定位，人物会跑位。 */
+                      document.documentElement.classList.add('l2d-asleep');
+                      oml2d.tipsMessage('那我先去边上歇会儿～', 2500, 3);
+                    },
+                  },
+                  {
+                    id: 'reload',
+                    icon: 'icon-switch',
+                    title: '重新加载模型',
+                    onClick: function (oml2d) {
+                      document.documentElement.classList.remove('l2d-asleep');
+                      oml2d.reloadModel();
+                    },
+                  },
+                ],
+              },
+            });
+          } catch (e) {
+            console.warn('[live2d] 初始化失败，已跳过：', e && e.message);
+          }
+        }
+
+        /* 自己写的「唤醒」按钮：休息状态下人物被 CSS 收走，需要一个常驻的回程入口 */
+        function mountWakeButton() {
+          if (document.getElementById('l2dWake')) return;
+          var btn = document.createElement('button');
+          btn.id = 'l2dWake';
+          btn.className = 'l2d-wake';
+          btn.type = 'button';
+          btn.title = '把雪初音叫回来';
+          btn.setAttribute('aria-label', '把雪初音叫回来');
+          btn.innerHTML =
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" ' +
+            'stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>' +
+            '<circle cx="12" cy="12" r="4"/></svg>';
+          btn.addEventListener('click', function () {
+            document.documentElement.classList.remove('l2d-asleep');
+            var api = window.__cabinOml2d;
+            if (api) api.tipsMessage('我回来啦！', 3000, 3);
+          });
+          document.body.appendChild(btn);
+        }
+
+        function loadLib() {
+          if (window.OML2D) {
+            boot();
+            return;
+          }
+          var s = document.createElement('script');
+          s.src = cfg.libUrl;
+          s.async = true;
+          s.onload = boot;
+          s.onerror = function () {
+            /* 失败就静默跳过：看板娘是锦上添花，不能因为它把页面搞出报错 */
+            console.warn('[live2d] 库加载失败，已跳过');
+          };
+          document.head.appendChild(s);
+        }
+
+        var retried = false;
+
+        function start() {
+          /* 判断放在这里（load 之后）而不是解析阶段：反正要下载也是这个点才下，
+             在真正要花流量的时候再问「该不该花」，语义才对。 */
+          var why = skipReason();
+          if (why) {
+            console.info('[live2d] 这次先不加载：' + why);
+            /* 「网太慢」是一时的，等它变快了再补上 —— 别让用户永远看不到人。
+               其余几种（省流开关、系统偏好、小屏）是用户的明确选择，不该自己反悔。 */
+            if (why === '网络确实很慢' && !retried && CONN.addEventListener) {
+              CONN.addEventListener('change', function onNet() {
+                if (/^(slow-)?2g$/.test(CONN.effectiveType || '')) return;
+                CONN.removeEventListener('change', onNet);
+                retried = true;
+                start();
+              });
+            }
+            return;
+          }
+          mountWakeButton();
+          if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(loadLib, { timeout: 3000 });
+          } else {
+            setTimeout(loadLib, 1200);
+          }
+        }
+
+        if (document.readyState === 'complete') start();
+        else window.addEventListener('load', start, { once: true });
+      })();
+    </script>
+  )
+}

@@ -14,6 +14,7 @@ import LeafFall from '@components/LeafFall.astro';
 import MusicPlayer from '@components/MusicPlayer.astro';
 import SearchModal from '@components/SearchModal.astro';
 import ClickEffect from '@components/ClickEffect.astro';
+import Live2DWidget from '@components/Live2DWidget.astro';
 import { SITE } from '@/config';
 import { withBase } from '@/utils/url';
 
@@ -116,6 +117,10 @@ const pageDesc = description || SITE.description;
       <MusicPlayer />
       <SearchModal />
       <ClickEffect />
+
+      <!-- Live2D 看板娘（雪初音）。放在常驻层里的原因见组件注释：
+           交上去的 canvas 在跳页时被保留，人物不会闪一下重来，也不会重下贴图 -->
+      <Live2DWidget />
 
       <button class="back-to-top" id="backToTop" aria-label="返回顶部" title="返回顶部">
         <!-- 进度环：外圈随阅读进度增长（参考 gongyeqi 的 bottom-top） -->

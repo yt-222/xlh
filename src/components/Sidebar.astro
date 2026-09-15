@@ -16,6 +16,8 @@ import { SITE, SKILLS, NOW_ITEMS, ACTIVE_SOCIAL_LINKS } from '@/config';
 import { withBase } from '@/utils/url';
 import WeatherCard from '@components/WeatherCard.astro';
 import CalendarHeatmap from '@components/CalendarHeatmap.astro';
+import MonthCalendar from '@components/MonthCalendar.astro';
+import DailyQuote from '@components/DailyQuote.astro';
 import AnnounceBox from '@components/AnnounceBox.astro';
 
 interface PostLite {
@@ -134,10 +136,16 @@ const ICONS: Record<string, string> = {
       </>
     ) : (
       <>
+        {/* 每日一言（按天轮转，激励用） */}
+        <DailyQuote />
+
         {/* 天气卡（江夏实时） */}
         <WeatherCard />
 
-        {/* 写作轨迹（日历热力图） */}
+        {/* 月历（当月尺度：今天几号、哪天发过文章） */}
+        <MonthCalendar posts={posts} />
+
+        {/* 写作轨迹（半年尺度的密度热力图，和月历互补） */}
         <CalendarHeatmap posts={posts} />
 
         {/* 技能 */}

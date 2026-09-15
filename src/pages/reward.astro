@@ -1,0 +1,124 @@
+---
+/**
+ * 打赏页
+ *
+ * 设计上刻意分了两层：
+ *   上半是「钱会花到哪」——写清楚用途，比一句「感谢支持」更让人愿意点开收款码；
+ *   下半才是收款码本身。
+ *
+ * ⚠️ 收款码不会自动生成。REWARD.wechat / REWARD.alipay 留空时，
+ * 这里渲染的是一个「说明怎么放图」的占位框 —— 二维码牵扯真钱，
+ * 编不出来也不该编。放好图文件、把路径填进 config.ts 即可。
+ */
+import Layout from '@layouts/Layout.astro';
+import NavBar from '@components/NavBar.astro';
+import Footer from '@components/Footer.astro';
+import { SITE, REWARD } from '@/config';
+import { withBase } from '@/utils/url';
+
+/** 收款码槽位：留空就渲染占位框 */
+const slots = [
+  { key: 'wechat', name: '微信', src: REWARD.wechat.trim(), tip: '「我 → 服务 → 收付款 → 二维码收款 → 保存收款码」' },
+  { key: 'alipay', name: '支付宝', src: REWARD.alipay.trim(), tip: '「收钱 → 保存图片」，裁掉多余白边即可' },
+].filter(Boolean);
+
+const hasAnyQr = slots.some((s) => s.src.length > 0);
+---
+
+<Layout title="打赏" description={`请 ${SITE.author} 喝一杯 —— 支持这间小屋继续更新`}>
+  <div class="game-scene">
+    <div class="scroll-container">
+      <div class="web-wrapper">
+        <NavBar />
+
+        <div class="page-header">
+          <h1 class="page-title">打赏</h1>
+          <p class="page-subtitle">{REWARD.lead}</p>
+        </div>
+
+        <!-- 钱花在哪 -->
+        <div class="reward-reasons">
+          {
+            REWARD.reasons.map((r) => (
+              <div class="reward-reason" data-spotlight data-animate>
+                <div class="reward-reason__icon">{r.icon}</div>
+                <div class="reward-reason__text">
+                  <div class="reward-reason__title">{r.title}</div>
+                  <div class="reward-reason__desc">{r.desc}</div>
+                </div>
+              </div>
+            ))
+          }
+        </div>
+
+        <!-- 收款码 -->
+        <div class="about-card reward-card" data-animate>
+          <h3 class="about-section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 0 0 0-7.8z" />
+            </svg>
+            收款码
+          </h3>
+
+          <div class="reward-qr-grid">
+            {
+              slots.map((s) => (
+                <div class="reward-qr">
+                  <div class:list={['reward-qr__frame', { 'is-empty': !s.src }]}>
+                    {s.src ? (
+                      <img src={withBase(s.src.startsWith('/') ? s.src : '/' + s.src)} alt={`${s.name}收款码`} loading="lazy" />
+                    ) : (
+                      <div class="reward-qr__placeholder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                          stroke-linecap="round" stroke-linejoin="round">
+                          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+                          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+                          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+                          <path d="M14 14h3v3h-3zM21 14v3M14 21h7" />
+                        </svg>
+                        <span>还没放{s.name}收款码</span>
+                      </div>
+                    )}
+                  </div>
+                  <div class="reward-qr__name">{s.name}</div>
+                </div>
+              ))
+            }
+          </div>
+
+          {
+            !hasAnyQr && (
+              <div class="reward-howto">
+                <div class="reward-howto__title">怎么把收款码放上来</div>
+                <ol>
+                  <li>
+                    把两张收款码图片放进 <code>xlh-blog/public/reward/</code>，命名成
+                    <code>wechat.png</code> 和 <code>alipay.png</code>
+                  </li>
+                  <li>
+                    打开 <code>src/config.ts</code>，把 <code>REWARD.wechat</code> 填
+                    <code>'reward/wechat.png'</code>，<code>REWARD.alipay</code> 填
+                    <code>'reward/alipay.png'</code>
+                  </li>
+                  <li>重新构建部署，占位框就会变成真的收款码</li>
+                </ol>
+                <div class="reward-howto__hint">
+                  {slots.map((s) => <div>· {s.name}：{s.tip}</div>)}
+                </div>
+              </div>
+            )
+          }
+        </div>
+
+        <!-- 说明 -->
+        <div class="reward-note" data-animate>
+          <span class="reward-note__mark">※</span>
+          {REWARD.note}
+        </div>
+
+        <Footer />
+      </div>
+    </div>
+  </div>
+</Layout>

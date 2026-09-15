@@ -1947,6 +1947,528 @@ html:not(.day-theme) .click-burst {
 }
 
 /* =========================================================================
+   23. 每日一言 / 日历 / Live2D 看板娘 / 打赏页
+   -------------------------------------------------------------------------
+   为什么全放在 enhance.css：这一层是可以整体删掉的（Layout 里去掉一行
+   import 就全没了），新增的实验性模块都归这里，不污染 global.css 的基础版式。
+   ========================================================================= */
+
+/* ---------- 23.1 每日一言 ---------- */
+.quote-card {
+  position: relative;
+  background:
+    radial-gradient(circle at 88% 6%, var(--halo-sky), transparent 58%),
+    radial-gradient(circle at 8% 96%, var(--halo-sun), transparent 58%),
+    var(--card-bg);
+}
+
+.quote-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.quote-head .sidebar-title {
+  margin: 0;
+}
+
+.quote-date {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.quote-body {
+  position: relative;
+  margin: 0;
+  padding: 14px 14px 12px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-sub);
+  background: var(--card);
+  overflow: hidden;
+}
+
+/* 大号装饰引号：压在左上角，用主题色但做得很淡，只当纹理用 */
+.quote-spark {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--sky);
+  opacity: 0.2;
+  pointer-events: none;
+  user-select: none;
+}
+
+.quote-text {
+  position: relative;
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.9;
+  color: var(--text);
+  letter-spacing: 0.2px;
+}
+
+.quote-author {
+  display: block;
+  margin-top: 10px;
+  text-align: right;
+  font-style: normal;
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+/* 没署名时（自己写的那几句）不要留一段空行 */
+.quote-author:empty {
+  display: none;
+}
+
+.quote-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.quote-index {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.quote-next {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-sub);
+  background: var(--card-bg-hover);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+.quote-next:hover {
+  color: var(--text);
+  border-color: var(--border-ac);
+  background: var(--glass-strong);
+}
+.quote-next svg {
+  width: 13px;
+  height: 13px;
+}
+.quote-next:active svg {
+  transform: rotate(-90deg);
+  transition: transform 0.3s var(--ease-spring);
+}
+
+/* ---------- 23.2 月历 ---------- */
+.mc-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mc-btn {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-sub);
+  background: var(--card-bg);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.mc-btn:hover {
+  color: var(--text);
+  border-color: var(--border-ac);
+}
+.mc-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mc-today {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-sub);
+  background: var(--card-bg);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.mc-today:hover {
+  color: var(--text);
+  border-color: var(--border-ac);
+}
+
+.mc-weekdays,
+.mc-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.mc-weekdays {
+  margin-bottom: 5px;
+}
+.mc-weekdays span {
+  text-align: center;
+  font-size: 0.66rem;
+  color: var(--muted);
+  opacity: 0.75;
+}
+/* 周末两天用主题色轻点一下，扫读时更容易定位 */
+.mc-weekdays span:first-child,
+.mc-weekdays span:last-child {
+  color: var(--sky);
+  opacity: 0.9;
+}
+
+.mc-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  border-radius: 7px;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+  border: 1px solid transparent;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+.mc-cell.is-empty {
+  border: none;
+}
+/* 未来的日子压暗，视线自然落在「已经发生的」上面 */
+.mc-cell.is-future {
+  opacity: 0.34;
+}
+
+.mc-cell.has-post {
+  color: var(--text);
+  background: var(--card-bg-hover);
+  border-color: var(--border-sub);
+}
+/* 发过文章的日子在数字下面点一个小点 */
+.mc-cell.has-post::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: var(--sky);
+}
+
+.mc-cell.is-today {
+  color: var(--text);
+  font-weight: 700;
+  border-color: var(--sky);
+  background: var(--halo-sky);
+}
+.mc-cell.is-today::after {
+  background: var(--sun);
+}
+
+.mc-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-sub);
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+.mc-more {
+  color: var(--sky);
+  text-decoration: none;
+  opacity: 0.9;
+}
+.mc-more:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
+/* ---------- 23.3 Live2D 看板娘 ---------- */
+/* 只当挂载点用，本身不参与排版。
+   ⚠️ 千万不要给它加 transform / filter / backdrop-filter / contain：
+   那会让里面 position:fixed 的舞台失去「相对视口定位」，人物会整块跑掉。 */
+.live2d-host {
+  transition: opacity 0.55s var(--transition-smooth);
+}
+
+/* 「休息」状态：整块淡出并屏蔽点击（含库生成的菜单）。
+   只用 opacity —— 理由同上：opacity 只创建层叠上下文，不会创建包含块。 */
+html.l2d-asleep .live2d-host {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 回程入口：休息时才出现，位置就落在人物原来站的地方 */
+.l2d-wake {
+  position: fixed;
+  left: 18px;
+  bottom: 84px;
+  z-index: 88;
+  display: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-sub);
+  background: var(--glass-strong);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--sky);
+  cursor: pointer;
+  box-shadow: var(--card-shadow);
+  transition:
+    transform 0.25s var(--ease-spring),
+    border-color var(--transition-fast);
+}
+html.l2d-asleep .l2d-wake {
+  display: grid;
+}
+.l2d-wake:hover {
+  transform: scale(1.1) rotate(45deg);
+  border-color: var(--border-ac);
+}
+.l2d-wake svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 看板娘的气泡：库会插到常驻层里，这里只调字体，避免它用默认的衬线体 */
+.live2d-host [class^='oml2d'] {
+  font-family: var(--font-body);
+}
+
+/* 气泡位置：库的默认值是 top:0 / 宽 60% / 最小高 100px —— 贴在舞台顶部。
+   但人物现在基本占满整个舞台，照默认放正好糊在她脸上。
+   所以把气泡挪到舞台**上方**（bottom:100%）。舞台没有 overflow:hidden，
+   可以正常露到外面，看起来就是人物头顶上飘着一句话。
+   注意：这些值都是库写在元素的 inline style 上的，
+   普通选择器盖不住，必须 !important。 */
+.live2d-host #oml2d-tips {
+  top: auto !important;
+  bottom: calc(100% + 10px) !important;
+  width: 252px !important;
+  min-height: 0 !important;
+  padding: 9px 12px !important;
+}
+
+@media (max-width: 640px) {
+  .l2d-wake {
+    left: 14px;
+    bottom: 78px;
+  }
+}
+
+/* ---------- 23.4 打赏页 ---------- */
+.reward-reasons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.reward-reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 20px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-sub);
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.reward-reason__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 1.25rem;
+  background: var(--halo-sky);
+  border: 1px solid var(--border-sub);
+}
+
+.reward-reason__title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.reward-reason__desc {
+  font-size: 0.85rem;
+  line-height: 1.8;
+  color: var(--muted);
+}
+
+.reward-card {
+  margin-bottom: 20px;
+}
+
+.reward-qr-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  justify-content: center;
+  padding: 6px 0 2px;
+}
+
+.reward-qr {
+  text-align: center;
+}
+
+.reward-qr__frame {
+  display: grid;
+  place-items: center;
+  width: 190px;
+  height: 190px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-sub);
+  background: #fff;
+  overflow: hidden;
+}
+.reward-qr__frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+/* 没放收款码时用虚线框 + 说明，不塞一张假二维码 */
+.reward-qr__frame.is-empty {
+  border: 1px dashed var(--border-ac);
+  background: var(--card-bg);
+}
+
+.reward-qr__placeholder {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+  text-align: center;
+}
+.reward-qr__placeholder svg {
+  width: 42px;
+  height: 42px;
+  color: var(--sky);
+  opacity: 0.55;
+}
+
+.reward-qr__name {
+  margin-top: 10px;
+  font-family: var(--font-pixel);
+  font-size: 0.85rem;
+  letter-spacing: 1.5px;
+  color: var(--text);
+}
+
+.reward-howto {
+  margin-top: 24px;
+  padding: 18px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-sub);
+  background: var(--card);
+}
+
+.reward-howto__title {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+
+.reward-howto ol {
+  margin: 0;
+  padding-left: 1.3em;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 2;
+}
+.reward-howto code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--card-bg-hover);
+  border: 1px solid var(--border-sub);
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  color: var(--sky);
+}
+
+.reward-howto__hint {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-sub);
+  font-size: 0.78rem;
+  line-height: 1.9;
+  color: var(--muted);
+  opacity: 0.9;
+}
+
+.reward-note {
+  display: flex;
+  gap: 8px;
+  padding: 4px 2px 8px;
+  font-size: 0.82rem;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.reward-note__mark {
+  flex: none;
+  color: var(--sun);
+}
+
+@media (max-width: 640px) {
+  .reward-qr__frame {
+    width: 150px;
+    height: 150px;
+  }
+  .reward-qr-grid {
+    gap: 18px;
+  }
+}
+
+/* =========================================================================
    22. 新增动画的无障碍降级（并入「减少动态」约定）
    ========================================================================= */
 @media (prefers-reduced-motion: reduce) {
@@ -1960,5 +2482,8 @@ html:not(.day-theme) .click-burst {
   }
   .click-burst {
     display: none;
+  }
+  .live2d-host {
+    transition: none;
   }
 }
