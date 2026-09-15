@@ -1461,6 +1461,23 @@ html.day-theme .hero-wave path {
   color: var(--blue);
   background: var(--halo-blue);
 }
+/* 播不了的曲目（多为会员/版权限定，拿不到音频流）：
+   灰掉并划一道删除线，让用户一眼看出「这首点不了」，而不是反复点了没反应 */
+.mp-track.is-bad {
+  color: var(--muted);
+  opacity: 0.55;
+}
+.mp-track.is-bad .mp-track__name {
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+.mp-track.is-bad::after {
+  content: '✕';
+  flex: none;
+  margin-left: 6px;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
 .mp-track__name {
   min-width: 0;
   white-space: nowrap;
