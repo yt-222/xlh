@@ -20,6 +20,14 @@
  *    ⚠️ 别再用 effectiveType 的 3g 档当门槛 —— 理由见脚本里那段长注释，
  *    简单说就是它「还没测出网速」时默认就报 3g，会把所有首次访问的人误杀。
  *
+ * 4) **「加载成功」不等于「看得见」**。这个组件栽过两次，都是同一个盲区：
+ *    · 库把休息状态持久化在 localStorage.OML2D_STATUS，而唤醒入口只有状态条 ——
+ *      我们把状态条关了，于是残留的 sleep 会让访客永久看不到人（脚本里已清掉该键）；
+ *    · 库的滑入靠一条 CSS 动画把舞台从 translateY(130%)（视口外）拉回来，
+ *      动画没落地时静态位置就是「藏在视口下面」，而控制台毫无提示。
+ *    所以验收一律量 getBoundingClientRect()，不许用「截元素看有没有颜色」——
+ *    元素在视口外时截元素照样能截到画好的内容，会得出假的「正常」。
+ *
  * 配置在 src/config.ts 的 LIVE2D 里。
  */
 import { LIVE2D } from '@/config';
@@ -129,12 +137,143 @@ const runtime = {
 
         var booted = false;
 
+        /* ---------- 落地校验（兜底） ----------
+           这是查「加载全成功、但页面上看不见人」时挖出来的第二个坑。
+
+           库的「滑入」纯靠一条 CSS 动画：
+             stage.setStyle({ animationName: 'oml2d-stage-slide-in', animationFillMode: 'forwards' })
+           而舞台的**静态** transform 一直留着 translateY(130%)（= 视口正下方，看不见）。
+           换句话说，静态样式本来就把人藏在视口外，全靠那条动画在播完后把它拉回来。
+
+           于是只要动画没播完/没生效（样式竞态、动画被外部禁用、库状态被判成 sleep、
+           模型加载在中途断掉），结果就是：**控制台一声不响，资源全 200，人却停在视口外**。
+           这正是最难查的那类「看起来全都对，就是看不见」。
+
+           所以这里不信任动画，自己验一次「人是不是真在视口里」：
+           等库把 status 置为 true（= 它认为滑入已完成）之后量一次 rect，
+           还在视口外就判定动画没落地，直接把静态位改写成 transform:none。
+
+           ⚠️ 反过来也要注意：验证必须量 `getBoundingClientRect()` 而不是
+           「截元素看有没有颜色」—— 元素被摆在视口外时，截元素照样能截到画好的内容，
+           那会得出「显示正常」的假结论。
+
+           ⚠️ 而且这段守望**必须先确认舞台已被库接管**再判断位置，否则会被
+           「还没接管时的初始壳」骗过去（它恰好也满足『在视口内』）——
+           细节写在下面 stageReady() 上，这是第一版兜底失效的真因。 */
+        /** 兜底自己的诊断记录，方便测试区分「没触发」和「提前下班」 */
+        window.__l2dLanded = { polls: 0, forced: 0, stop: '' };
+
+        /**
+         * 舞台有没有被库真正接管。
+         *
+         * ⚠️ 这个判断是兜底第一版栽过的地方，别删。
+         * 库创建 <div id="oml2d-stage"> 之后，有一段「还没被接管」的窗口期：
+         * 它是 position:static、占满整宽（1422px）、高 24px、贴在文档顶部。
+         * 而兜底原本只问「宽高都 >0 且有一部分落在视口里吗」—— 这个初始壳
+         * **恰好全部满足**，于是兜底以为人已经落位，直接清掉定时器下班。
+         * 等库真正把舞台摆成 fixed + translateY(130%)（视口下方，看不见）时，
+         * 已经没有人在看着它了。症状和「兜底没写」完全一样，很能骗人。
+         *
+         * 所以必须先确认形态：position 落到 fixed/absolute，且尺寸像舞台。
+         */
+        function stageReady(st) {
+          if (!st) return false;
+          var g = window.getComputedStyle(st);
+          if (g.position !== 'fixed' && g.position !== 'absolute') return false;
+          var r = st.getBoundingClientRect();
+          return r.width >= 120 && r.height >= 120;
+        }
+
+        function ensureLanded(api) {
+          var log = window.__l2dLanded;
+          var tries = 0;
+          var MAX = 44; /* 700ms × 44 ≈ 30s：够下完 979KB 库 + 429KB 贴图再滑入 */
+          var HARD = MAX + 8; /* 摆回之后再给它一点观察时间 */
+          var timer = setInterval(function () {
+            tries++;
+            log.polls = tries;
+            var st = document.getElementById('oml2d-stage');
+
+            /* 还没被库接管（含上面说的那个初始壳）→ 什么都不判，继续等 */
+            if (!api || !api.stage || !stageReady(st)) {
+              if (tries > HARD) {
+                log.stop = log.stop || 'give-up(never-ready)';
+                clearInterval(timer);
+              }
+              return;
+            }
+
+            var r = st.getBoundingClientRect();
+            var inView = r.top < window.innerHeight && r.bottom > 0;
+            var claimed = api.stage.status === true; /* 库自己认为滑入已完成 */
+            var settled = claimed || tries > MAX;    /* 已经过了「动画还在跑」的阶段 */
+
+            if (inView && settled) {
+              log.stop = 'in-view';
+              clearInterval(timer);
+              return;
+            }
+
+            if (!inView && settled) {
+              /* ⚠️ 只在「库声称滑入已完成、人却还在视口外」时才补位 —— 这才是
+                 「动画没落地」的确切特征。别放宽成「不在视口里就补」：
+                 滑入动画刚起步那一刻，元素本来就在 translateY(130%) 的视口外，
+                 放宽就会在动画开跑前先把她闪出来一下，再跳下去重新滑上来
+                 （线上 B 场景真踩到过，兜底会误报一次）。 */
+              try {
+                api.stage.setStyle({ transform: 'none' });
+                log.forced++;
+                if (!log.stop) {
+                  log.stop = 'force-transform';
+                  console.info('[live2d] 滑入动画没落地，已把舞台直接摆回视口内');
+                }
+              } catch (e) {
+                /* 兜底失败也不该把页面搞出报错 */
+                log.stop = 'force-failed';
+                clearInterval(timer);
+                return;
+              }
+            }
+            if (tries > HARD) {
+              log.stop = log.stop || 'give-up(after-force)';
+              clearInterval(timer);
+            }
+          }, 700);
+        }
+
         function boot() {
           if (booted || !window.OML2D) return;
           booted = true;
 
           var stageW = (cfg.stage && cfg.stage.width) || 300;
           var stageH = (cfg.stage && cfg.stage.height) || 320;
+
+          /* ---------- 清掉库持久化的「休息」状态 ----------
+             库把休息状态**写进 localStorage**（键 OML2D_STATUS，值 'sleep'/'active'），
+             并在 initialize() 里据此决定要不要滑入：
+
+               const t = J0() || options.initialStatus;      // J0() 读 localStorage
+               t === 'sleep'
+                 ? (tips.clear(), statusBar.open(restMessage),
+                    statusBar.setClickEvent(() => stage.slideIn()))   // ← 唯一的唤醒入口
+                 : stage.slideIn();
+
+             注意那个唤醒入口**只有状态条**。而我们为了让界面干净把状态条 disable 了
+             （见 config.ts 的 hideStatusBar），于是那个元素根本不存在 ——
+             一旦 localStorage 里留下 'sleep'，这个访客就**永久看不到人，也没有任何回程入口**。
+
+             谁会写下 'sleep'：库自己的 stage.slideOut()（我们的「重新加载模型」菜单会走
+             reloadModel → loadModel → slideOut）。正常情况紧接着就 slideIn 回来了，
+             但只要中途跳页、加载失败或刷新，'sleep' 就留在那里变成单向陷阱。
+
+             我们自己的「休息」用的是纯 CSS（html.l2d-asleep + 体外唤醒按钮），
+             跟库这套状态机无关 —— 所以库这份持久化状态对我们只有害处。
+             直接清掉：任何残留的 sleep 都不该让她消失。清掉后库回到默认 initialStatus='active'。 */
+          try {
+            localStorage.removeItem('OML2D_STATUS');
+          } catch (e) {
+            /* 隐私模式等取不到 localStorage，忽略即可 */
+          }
 
           try {
             window.__cabinOml2d = window.OML2D.loadOml2d({
@@ -234,6 +373,9 @@ const runtime = {
           } catch (e) {
             console.warn('[live2d] 初始化失败，已跳过：', e && e.message);
           }
+
+          /* 交给兜底去看一眼「人到底有没有落到视口里」 */
+          ensureLanded(window.__cabinOml2d);
         }
 
         /* 自己写的「唤醒」按钮：休息状态下人物被 CSS 收走，需要一个常驻的回程入口 */
@@ -252,6 +394,16 @@ const runtime = {
           btn.addEventListener('click', function () {
             document.documentElement.classList.remove('l2d-asleep');
             var api = window.__cabinOml2d;
+            /* 我们的「休息」是 CSS 做的，但库那边也可能处在自己的「休息」状态
+               （status === false，舞台被摆在 translateY(130%) 的视口外）。
+               只切 class 是叫不回来的 —— 两套状态一起唤醒。 */
+            if (api && api.stage && api.stage.status === false) {
+              try {
+                api.stage.slideIn();
+              } catch (e) {
+                /* 忽略：叫不回来也不该把页面搞出报错 */
+              }
+            }
             if (api) api.tipsMessage('我回来啦！', 3000, 3);
           });
           document.body.appendChild(btn);
