@@ -103,6 +103,35 @@ draft: false                 # true 时不会出现在线上
 
 想换配色，改 `src/styles/global.css` 最上面的 `:root` 变量（夜主题）和 `html.day-theme`（日主题），一共十几个颜色值。
 
+## 日常同步（改完就推 GitHub）
+
+工作区根目录放了两个批处理，双击即可：
+
+| 双击 | 做了什么 |
+| --- | --- |
+| `push-blog.bat` | 暂存改动 → 提交 → 推到 GitHub |
+| `publish-blog.bat` | 上面全部 → 再构建并部署到 Cloudflare Pages |
+
+也可以在命令行里带参数跑：
+
+```bash
+node push-blog.mjs                  # 提交 + 推 GitHub（默认）
+node push-blog.mjs --deploy         # 再加构建 + 部署上线
+node push-blog.mjs --msg "改了什么"  # 自定义提交说明（默认是「更新博客 日期 时间」）
+node push-blog.mjs --check          # 推送前先跑一遍产物自检 verify.mjs
+node push-blog.mjs --dry            # 只看有哪些改动，什么都不动
+node push-blog.mjs --no-push        # 只提交到本地，不推送
+```
+
+> ⚠️ **推 GitHub ≠ 站点更新。** Cloudflare Pages 项目 `lzz-cabin` 没有绑定 Git
+> （历史部署全是 `ad_hoc` 直传，不带 commit 号），所以 `push-blog.bat` 跑完，
+> `lzz-cabin.pages.dev` 上看到的仍是旧内容。要站点跟着变，用 `publish-blog.bat`，
+> 或者单独跑 `node deploy_lzz_cabin.mjs`。
+
+> 推送偶尔偏慢属正常：仓库是从远端「字节级重建」出来的浅仓库，
+> `.git/hooks/pre-push` 会在推送前自动执行 `git fetch --unshallow` 补全历史
+> （服务端拒绝来自浅仓库的推送）。补完一次之后就快了，实测约 7 秒。
+
 ## 部署
 
 ### 方式一：GitHub Pages（推送即部署）
